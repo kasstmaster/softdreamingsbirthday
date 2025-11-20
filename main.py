@@ -184,7 +184,7 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
         title=title,  # <-- THIS WORKS
         description=(
             f"Requested by {ctx.author.mention}\n\n"
-            "[REQUEST A TITLE](https://discord.com/channels/1205041211610501120/1440989357535395911/1440992347709243402)"
+            "**[REQUEST A TITLE](https://discord.com/channels/1205041211610501120/1440989357535395911/1440992347709243402)**"
         ),
         color=0x2e2f33,
     )
