@@ -205,7 +205,9 @@ async def on_member_join(member: discord.Member):
     # DM new member
     try:
         await member.send(
-            "Hey, welcome to the server. Feel free to add your birthday here so we can all celebrate!"
+            """Hey, welcome to the server. Feel free to add your birthday in the channel below so we can all celebrate.
+        
+https://discord.com/channels/1205041211610501120/1435375785220243598"""
         )
     except discord.Forbidden:
         # DMs disabled; ignore
