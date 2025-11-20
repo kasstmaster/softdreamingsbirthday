@@ -187,6 +187,18 @@ async def birthdays_cmd(ctx):
     view = BirthdayListView(ctx.guild)
     await ctx.respond(embed=embed, view=view)
 
+@bot.slash_command(name="say", description="Make the bot say something in this channel")
+async def say(
+    ctx,
+    message: discord.Option(str, "Message to send", required=True)
+):
+    # Only admins or server owner
+    if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
+        return await ctx.respond("You need Administrator.", ephemeral=True)
+
+    await ctx.channel.send(message)
+    await ctx.respond("Sent!", ephemeral=True)
+
 
 # ───────────── EVENTS ─────────────
 
