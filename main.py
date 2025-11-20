@@ -219,6 +219,33 @@ async def say(ctx, message: discord.Option(str, "Message", required=True)):
     await ctx.channel.send(message)
     await ctx.respond("Sent!", ephemeral=True)
 
+@bot.slash_command(name="remove_for", description="Remove a birthday for another member")
+async def remove_birthday_for(
+    ctx,
+    member: discord.Option(discord.Member, "Member to remove birthday for", required=True)
+):
+    # Only admins or owner can use this
+    if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
+        return await ctx.respond("You need Administrator.", ephemeral=True)
+
+    data = await _load_storage_message()
+    gid = str(ctx.guild.id)
+    uid = str(member.id)
+
+    if gid not in data or uid not in data[gid]:
+        return await ctx.respond("That member has no birthday set.", ephemeral=True)
+
+    # Remove the birthday entry
+    del data[gid][uid]
+
+    # Save back to storage
+    await _save_storage_message(data)
+
+    # Update the public birthday list
+    await update_birthday_list_message(ctx.guild)
+
+    await ctx.respond(f"Removed birthday for {member.mention}.", ephemeral=True)
+
 
 # ───────────────────────────────────────────────
 # EVENTS
