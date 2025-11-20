@@ -15,21 +15,50 @@ bot = discord.Bot(intents=intents)
 # Role that should be given on someone's birthday
 BIRTHDAY_ROLE_ID = int(os.getenv("BIRTHDAY_ROLE_ID", "1217937235840598026"))
 
-# Private storage channel + message (the ones you gave me)
+# Private storage channel (bot will create its own storage message here)
 BIRTHDAY_STORAGE_CHANNEL_ID = int(os.getenv("BIRTHDAY_STORAGE_CHANNEL_ID", "1440912334813134868"))
-BIRTHDAY_STORAGE_MESSAGE_ID = int(os.getenv("BIRTHDAY_STORAGE_MESSAGE_ID", "1440912626333782147"))
+
+# ID of the message the bot uses as JSON storage (set at runtime)
+storage_message_id: int | None = None
 
 
 # ───────────── STORAGE IN DISCORD CHANNEL ─────────────
 
-async def _load_storage_message() -> dict:
-    """Load the birthday dict from the storage message."""
+async def initialize_storage_message():
+    """
+    Ensure there is a bot-authored storage message in the storage channel.
+    If one exists, remember its ID. Otherwise create a new one with "{}".
+    """
+    global storage_message_id
+
     channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
     if not channel:
+        print("Storage channel not found")
+        return
+
+    # Try to find an existing message authored by this bot
+    async for msg in channel.history(limit=50):
+        if msg.author == bot.user:
+            storage_message_id = msg.id
+            print(f"Found existing storage message: {storage_message_id}")
+            return
+
+    # Otherwise create a new storage message
+    msg = await channel.send("{}")
+    storage_message_id = msg.id
+    print(f"Created new storage message: {storage_message_id}")
+
+
+async def _load_storage_message() -> dict:
+    """Load the birthday dict from the storage message."""
+    global storage_message_id
+
+    channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
+    if not channel or storage_message_id is None:
         return {}
 
     try:
-        msg = await channel.fetch_message(BIRTHDAY_STORAGE_MESSAGE_ID)
+        msg = await channel.fetch_message(storage_message_id)
     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
         return {}
 
@@ -45,12 +74,14 @@ async def _load_storage_message() -> dict:
 
 async def _save_storage_message(data: dict):
     """Save the birthday dict back to the storage message."""
+    global storage_message_id
+
     channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
-    if not channel:
+    if not channel or storage_message_id is None:
         return
 
     try:
-        msg = await channel.fetch_message(BIRTHDAY_STORAGE_MESSAGE_ID)
+        msg = await channel.fetch_message(storage_message_id)
     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
         return
 
@@ -162,6 +193,10 @@ async def birthdays_cmd(ctx):
 @bot.event
 async def on_ready():
     print(f"{bot.user} is online (birthday bot).")
+
+    # Make sure storage message exists before anything uses it
+    await initialize_storage_message()
+
     bot.loop.create_task(birthday_checker())
 
 
