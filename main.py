@@ -173,7 +173,10 @@ async def update_birthday_list_message(guild: discord.Guild):
     embed = await build_birthday_embed(guild)
 
     try:
-        await msg.edit(embed=embed)
+        allowed = discord.AllowedMentions(users=True)
+
+        await msg.edit(embed=embed, allowed_mentions=allowed)
+
         print("Birthday list updated.")
     except Exception as e:
         print("Failed to update list:", e)
