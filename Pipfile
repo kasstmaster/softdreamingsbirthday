@@ -1,0 +1,5 @@
+[packages]
+py-cord = "==2.4.1"
+
+[requires]
+python_version = "3.11"
