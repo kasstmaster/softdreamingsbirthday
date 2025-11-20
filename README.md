@@ -1,2 +1,0 @@
-# softdreamingsbirthday
-Discord Bot
