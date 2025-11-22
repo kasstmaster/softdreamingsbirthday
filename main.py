@@ -7,7 +7,7 @@ import discord
 import random  # for random picks
 
 intents = discord.Intents.default()
-intents.members = True
+intents.members = True 
 
 bot = discord.Bot(intents=intents)
 
@@ -17,7 +17,7 @@ BIRTHDAY_LIST_CHANNEL_ID = 1440989357535395911
 BIRTHDAY_LIST_MESSAGE_ID = 1440989655515271248
 MOVIE_REQUESTS_CHANNEL_ID = int(os.getenv("MOVIE_REQUESTS_CHANNEL_ID", "0"))
 
-# Separate storage channels for movies / TV shows
+# New: separate storage channels for movies / TV shows
 MOVIE_STORAGE_CHANNEL_ID = int(os.getenv("MOVIE_STORAGE_CHANNEL_ID", "0"))
 TV_STORAGE_CHANNEL_ID    = int(os.getenv("TV_STORAGE_CHANNEL_ID", "0"))
 
@@ -26,6 +26,39 @@ storage_message_id: int | None = None
 # In-memory media lists
 movie_titles: list[str] = []
 tv_titles: list[str] = []
+
+
+# ────────────────────── RAW MASTER MEDIA LIST (YOUR FULL LIST) ──────────────────────
+
+SECTION_HEADERS = {
+    "0-A",
+    "A","B","C","D","E","F","G","H","I","J","K",
+    "L","M","N","O","P","Q","R","S","T","U","V",
+    "W","X","Y","Z"
+}
+
+def parse_default_media():
+    movies: list[str] = []
+    shows: list[str] = []
+
+    for raw_line in RAW_MEDIA_LIST.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line in SECTION_HEADERS:
+            continue
+
+        if " - TV SHOW" in line:
+            title = line.replace(" - TV SHOW", "").strip()
+            if title:
+                shows.append(title)
+        else:
+            movies.append(line)
+
+    return movies, shows
+
+DEFAULT_MOVIES, DEFAULT_SHOWS = parse_default_media()
+
 
 # ────────────────────── BIRTHDAY STORAGE ──────────────────────
 
@@ -74,6 +107,7 @@ async def _save_storage_message(data: dict):
         text = text[:1900]
     await msg.edit(content=text)
 
+
 # ────────────────────── MEDIA (MOVIES / TV SHOWS) LISTS ──────────────────────
 
 async def _load_titles_from_channel(channel_id: int) -> list[str]:
@@ -91,18 +125,28 @@ async def _load_titles_from_channel(channel_id: int) -> list[str]:
                 titles.append(content)
     except discord.Forbidden:
         print(f"[Media] No permission to read history in channel {channel_id}.")
-        return []
-
-    titles.sort(key=str.lower)
     return titles
 
+
 async def initialize_media_lists():
-    """Load movies and TV shows from their storage channels into memory."""
+    """Load movies and TV shows from their storage channels into memory.
+       If a storage channel is empty, seed it from DEFAULT_MOVIES / DEFAULT_SHOWS.
+       Always keep in-memory lists sorted alphabetically.
+    """
     global movie_titles, tv_titles
 
     # Movies
     if MOVIE_STORAGE_CHANNEL_ID != 0:
         movie_titles = await _load_titles_from_channel(MOVIE_STORAGE_CHANNEL_ID)
+        ch = bot.get_channel(MOVIE_STORAGE_CHANNEL_ID)
+        if not movie_titles and isinstance(ch, discord.TextChannel):
+            print("[Media] Movie storage empty, seeding from default list.")
+            for title in DEFAULT_MOVIES:
+                await ch.send(title)
+            movie_titles = list(DEFAULT_MOVIES)
+
+        # Sort and dedupe
+        movie_titles = sorted(set(movie_titles), key=str.lower)
         print(f"[Media] Movies loaded: {len(movie_titles)}")
     else:
         print("[Media] MOVIE_STORAGE_CHANNEL_ID is 0 (movies disabled).")
@@ -110,109 +154,19 @@ async def initialize_media_lists():
     # TV shows
     if TV_STORAGE_CHANNEL_ID != 0:
         tv_titles = await _load_titles_from_channel(TV_STORAGE_CHANNEL_ID)
+        ch = bot.get_channel(TV_STORAGE_CHANNEL_ID)
+        if not tv_titles and isinstance(ch, discord.TextChannel):
+            print("[Media] TV storage empty, seeding from default list.")
+            for title in DEFAULT_SHOWS:
+                await ch.send(title)
+            tv_titles = list(DEFAULT_SHOWS)
+
+        # Sort and dedupe
+        tv_titles = sorted(set(tv_titles), key=str.lower)
         print(f"[Media] TV shows loaded: {len(tv_titles)}")
     else:
         print("[Media] TV_STORAGE_CHANNEL_ID is 0 (shows disabled).")
 
-# ────────────────────── MEDIA LIST UI (LETTER RANGE BUTTONS) ──────────────────────
-
-MEDIA_RANGES = {
-    "0–9": "0123456789",
-    "A–E": "abcde",
-    "F–J": "fghij",
-    "K–O": "klmno",
-    "P–T": "pqrst",
-    "U–Z": "uvwxyz",
-}
-
-def _first_alnum_char(s: str) -> str:
-    """Return the first alphanumeric character (lowercased), or '' if none."""
-    for ch in s.strip():
-        if ch.isalnum():
-            return ch.lower()
-    return ""
-
-class MediaListView(discord.ui.View):
-    def __init__(self, category: str):
-        # category is "movies" or "shows"
-        super().__init__(timeout=60)
-        self.category = category
-
-    async def _show_range(self, interaction: discord.Interaction, label: str):
-        items = movie_titles if self.category == "movies" else tv_titles
-        if not items:
-            return await interaction.response.send_message(
-                f"No {self.category} stored.",
-                ephemeral=True
-            )
-
-        allowed = set(MEDIA_RANGES[label])
-        filtered = [
-            title for title in items
-            if _first_alnum_char(title) in allowed
-        ]
-
-        # FIRST response (required)
-        await interaction.response.send_message(
-            f"Showing **{self.category}** in range **{label}**...",
-            ephemeral=True
-        )
-
-        if not filtered:
-            return await interaction.followup.send(
-                f"No {self.category} in the **{label}** range.",
-                ephemeral=True
-            )
-
-        lines = [f"{i+1}. {title}" for i, title in enumerate(filtered)]
-
-        chunks = []
-        current = []
-        length = 0
-
-        for line in lines:
-            if length + len(line) + 1 > 1900:
-                chunks.append("\n".join(current))
-                current = [line]
-                length = len(line) + 1
-            else:
-                current.append(line)
-                length += len(line) + 1
-
-        if current:
-            chunks.append("\n".join(current))
-
-        for chunk in chunks:
-            await interaction.followup.send(
-                f"```text\n{chunk}\n```",
-                ephemeral=True
-            )
-
-    # Row 0
-    @discord.ui.button(label="0–9", style=discord.ButtonStyle.secondary, row=0)
-    async def btn_0_9(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "0–9")
-
-    @discord.ui.button(label="A–E", style=discord.ButtonStyle.primary, row=0)
-    async def btn_A_E(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "A–E")
-
-    @discord.ui.button(label="F–J", style=discord.ButtonStyle.primary, row=0)
-    async def btn_F_J(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "F–J")
-
-    # Row 1
-    @discord.ui.button(label="K–O", style=discord.ButtonStyle.primary, row=1)
-    async def btn_K_O(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "K–O")
-
-    @discord.ui.button(label="P–T", style=discord.ButtonStyle.primary, row=1)
-    async def btn_P_T(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "P–T")
-
-    @discord.ui.button(label="U–Z", style=discord.ButtonStyle.primary, row=1)
-    async def btn_U_Z(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._show_range(interaction, "U–Z")
 
 # ────────────────────── BIRTHDAY HELPERS ──────────────────────
 
@@ -272,6 +226,7 @@ async def update_birthday_list_message(guild: discord.Guild):
         print("Birthday list updated.")
     except Exception as e:
         print("Failed to update list:", e)
+
 
 # ────────────────────── SLASH COMMANDS ──────────────────────
 
@@ -352,26 +307,48 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
 
     await ctx.respond("Your request has been posted for voting.", ephemeral=True)
 
+
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
     name="media_list",
-    description="Browse stored movies or TV shows by letter range (ephemeral)"
+    description="List stored movies or TV shows (ephemeral)"
 )
 async def media_list(
     ctx: discord.ApplicationContext,
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
     items = movie_titles if category == "movies" else tv_titles
+
     if not items:
         return await ctx.respond(f"No {category} stored.", ephemeral=True)
 
-    view = MediaListView(category=category)
-    await ctx.respond(
-        f"Select a letter range to view **{category}**.",
-        view=view,
-        ephemeral=True
-    )
+    # Just in case, keep it sorted each time
+    items = sorted(set(items), key=str.lower)
+
+    lines = [f"{i+1}. {title}" for i, title in enumerate(items)]
+
+    chunks = []
+    current = []
+    length = 0
+
+    for line in lines:
+        if length + len(line) + 1 > 1900:
+            chunks.append("\n".join(current))
+            current = [line]
+            length = len(line) + 1
+        else:
+            current.append(line)
+            length += len(line) + 1
+
+    if current:
+        chunks.append("\n".join(current))
+
+    await ctx.respond(f"```\n{chunks[0]}\n```", ephemeral=True)
+
+    for chunk in chunks[1:]:
+        await ctx.followup.send(f"```\n{chunk}\n```", ephemeral=True)
+
 
 @bot.slash_command(
     name="media_random",
@@ -386,8 +363,10 @@ async def media_random(
     if not items:
         return await ctx.respond(f"No {category} stored yet.", ephemeral=True)
 
-    choice = random.choice(items)
-    await ctx.respond(f"🎲 Random {category[:-1]}: **{choice}**")
+    choice_title = random.choice(items)
+    kind = "movie" if category == "movies" else "show"
+    await ctx.respond(f"🎲 Random {kind}: **{choice_title}**")
+
 
 @bot.slash_command(
     name="media_add",
@@ -420,7 +399,7 @@ async def media_add(
 
         await ch.send(title)
         movie_titles.append(title)
-        movie_titles.sort(key=str.lower)
+        movie_titles = sorted(set(movie_titles), key=str.lower)
         await ctx.respond(f"Added **{title}** to movies.", ephemeral=True)
 
     else:  # shows
@@ -435,8 +414,9 @@ async def media_add(
 
         await ch.send(title)
         tv_titles.append(title)
-        tv_titles.sort(key=str.lower)
+        tv_titles = sorted(set(tv_titles), key=str.lower)
         await ctx.respond(f"Added **{title}** to TV shows.", ephemeral=True)
+
 
 # ────────────────────── EVENTS ──────────────────────
 
@@ -444,7 +424,7 @@ async def media_add(
 async def on_ready():
     print(f"{bot.user} is online (birthday bot).")
     await initialize_storage_message()
-    await initialize_media_lists()
+    await initialize_media_lists()   # ← load / seed movies & shows
     bot.loop.create_task(birthday_checker())
 
 @bot.event
