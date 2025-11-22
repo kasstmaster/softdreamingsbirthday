@@ -347,12 +347,15 @@ async def media_random(
 ):
     items = movie_titles if category == "movies" else tv_titles
 
+    # Still keep errors ephemeral (they're just for the command user)
     if not items:
         return await ctx.respond(f"No {category} stored yet.", ephemeral=True)
 
     choice_title = random.choice(items)
     kind = "movie" if category == "movies" else "show"
-    await ctx.respond(f"🎲 Random {kind}: **{choice_title}**", ephemeral=True)
+
+    # ✅ PUBLIC message now (no `ephemeral=True`)
+    await ctx.respond(f"🎲 Random {kind}: **{choice_title}**")
 
 @bot.slash_command(
     name="media_add",
