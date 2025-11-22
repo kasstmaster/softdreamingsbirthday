@@ -5,9 +5,10 @@ from datetime import datetime
 
 import discord
 import random  # for random picks
+import math    # for pagination
 
 intents = discord.Intents.default()
-intents.members = True 
+intents.members = True
 
 bot = discord.Bot(intents=intents)
 
@@ -27,8 +28,8 @@ storage_message_id: int | None = None
 movie_titles: list[str] = []
 tv_titles: list[str] = []
 
-
 # ────────────────────── RAW MASTER MEDIA LIST (YOUR FULL LIST) ──────────────────────
+# (keep your RAW_MEDIA_LIST definition here)
 
 SECTION_HEADERS = {
     "0-A",
@@ -58,7 +59,6 @@ def parse_default_media():
     return movies, shows
 
 DEFAULT_MOVIES, DEFAULT_SHOWS = parse_default_media()
-
 
 # ────────────────────── BIRTHDAY STORAGE ──────────────────────
 
@@ -107,7 +107,6 @@ async def _save_storage_message(data: dict):
         text = text[:1900]
     await msg.edit(content=text)
 
-
 # ────────────────────── MEDIA (MOVIES / TV SHOWS) LISTS ──────────────────────
 
 async def _load_titles_from_channel(channel_id: int) -> list[str]:
@@ -125,8 +124,9 @@ async def _load_titles_from_channel(channel_id: int) -> list[str]:
                 titles.append(content)
     except discord.Forbidden:
         print(f"[Media] No permission to read history in channel {channel_id}.")
-    return titles
+        return []
 
+    return titles
 
 async def initialize_media_lists():
     """Load movies and TV shows from their storage channels into memory.
@@ -167,6 +167,59 @@ async def initialize_media_lists():
     else:
         print("[Media] TV_STORAGE_CHANNEL_ID is 0 (shows disabled).")
 
+# ────────────────────── MEDIA PAGINATION VIEW (PREV/NEXT BUTTONS) ──────────────────────
+
+class MediaPageView(discord.ui.View):
+    def __init__(self, items: list[str], category: str, per_page: int = 25):
+        super().__init__(timeout=120)
+        self.items = items
+        self.category = category  # "movies" or "shows"
+        self.per_page = per_page
+        self.total_pages = max(1, math.ceil(len(items) / per_page))
+        self.page = 0
+
+    def _page_text(self) -> str:
+        start = self.page * self.per_page
+        end = start + self.per_page
+        page_items = self.items[start:end]
+
+        if not page_items:
+            body = "No items on this page."
+        else:
+            # Keep global numbering (1..N)
+            lines = [
+                f"{i+1}. {title}"
+                for i, title in enumerate(page_items, start)
+            ]
+            body = "\n".join(lines)
+
+        header = f"{self.category.capitalize()} list (page {self.page+1}/{self.total_pages})"
+        return f"{header}\n```text\n{body}\n```"
+
+    def _sync_buttons(self):
+        # Disable prev/next at ends
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                if child.custom_id == "media_prev":
+                    child.disabled = (self.page == 0)
+                elif child.custom_id == "media_next":
+                    child.disabled = (self.page >= self.total_pages - 1)
+
+    @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.secondary, custom_id="media_prev")
+    async def prev_page(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if self.page == 0:
+            return await interaction.response.defer()
+        self.page -= 1
+        self._sync_buttons()
+        await interaction.response.edit_message(content=self._page_text(), view=self)
+
+    @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.secondary, custom_id="media_next")
+    async def next_page(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if self.page >= self.total_pages - 1:
+            return await interaction.response.defer()
+        self.page += 1
+        self._sync_buttons()
+        await interaction.response.edit_message(content=self._page_text(), view=self)
 
 # ────────────────────── BIRTHDAY HELPERS ──────────────────────
 
@@ -226,7 +279,6 @@ async def update_birthday_list_message(guild: discord.Guild):
         print("Birthday list updated.")
     except Exception as e:
         print("Failed to update list:", e)
-
 
 # ────────────────────── SLASH COMMANDS ──────────────────────
 
@@ -307,12 +359,11 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
 
     await ctx.respond("Your request has been posted for voting.", ephemeral=True)
 
-
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
     name="media_list",
-    description="List stored movies or TV shows (ephemeral)"
+    description="Browse stored movies or TV shows with Prev/Next buttons (ephemeral)"
 )
 async def media_list(
     ctx: discord.ApplicationContext,
@@ -323,32 +374,12 @@ async def media_list(
     if not items:
         return await ctx.respond(f"No {category} stored.", ephemeral=True)
 
-    # Just in case, keep it sorted each time
+    # Always sorted, deduped
     items = sorted(set(items), key=str.lower)
 
-    lines = [f"{i+1}. {title}" for i, title in enumerate(items)]
-
-    chunks = []
-    current = []
-    length = 0
-
-    for line in lines:
-        if length + len(line) + 1 > 1900:
-            chunks.append("\n".join(current))
-            current = [line]
-            length = len(line) + 1
-        else:
-            current.append(line)
-            length += len(line) + 1
-
-    if current:
-        chunks.append("\n".join(current))
-
-    await ctx.respond(f"```\n{chunks[0]}\n```", ephemeral=True)
-
-    for chunk in chunks[1:]:
-        await ctx.followup.send(f"```\n{chunk}\n```", ephemeral=True)
-
+    view = MediaPageView(items=items, category=category)
+    view._sync_buttons()
+    await ctx.respond(view._page_text(), view=view, ephemeral=True)
 
 @bot.slash_command(
     name="media_random",
@@ -366,7 +397,6 @@ async def media_random(
     choice_title = random.choice(items)
     kind = "movie" if category == "movies" else "show"
     await ctx.respond(f"🎲 Random {kind}: **{choice_title}**")
-
 
 @bot.slash_command(
     name="media_add",
@@ -416,7 +446,6 @@ async def media_add(
         tv_titles.append(title)
         tv_titles = sorted(set(tv_titles), key=str.lower)
         await ctx.respond(f"Added **{title}** to TV shows.", ephemeral=True)
-
 
 # ────────────────────── EVENTS ──────────────────────
 
