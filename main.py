@@ -138,59 +138,56 @@ class MediaListView(discord.ui.View):
         super().__init__(timeout=60)
         self.category = category
 
-    async def _show_range(
-        self,
-        interaction: discord.Interaction,
-        label: str,   # e.g. "A–E"
-    ):
-        items = movie_titles if self.category == "movies" else tv_titles
-        if not items:
-            await interaction.response.send_message(
-                f"No {self.category} stored.",
-                ephemeral=True
-            )
-            return
+    async def _show_range(self, interaction: discord.Interaction, label: str):
+    items = movie_titles if self.category == "movies" else tv_titles
+    if not items:
+        return await interaction.response.send_message(
+            f"No {self.category} stored.",
+            ephemeral=True
+        )
 
-        allowed = set(MEDIA_RANGES[label])  # e.g. {'a','b','c','d','e'}
+    allowed = set(MEDIA_RANGES[label])
+    filtered = [
+        title for title in items
+        if _first_alnum_char(title) in allowed
+    ]
 
-        filtered = [
-            title for title in items
-            if _first_alnum_char(title) in allowed
-        ]
+    # FIRST response (required)
+    await interaction.response.send_message(
+        f"Showing **{self.category}** in range **{label}**...",
+        ephemeral=True
+    )
 
-        await interaction.response.defer(ephemeral=True, thinking=False)
+    if not filtered:
+        return await interaction.followup.send(
+            f"No {self.category} in the **{label}** range.",
+            ephemeral=True
+        )
 
-        if not filtered:
-            await interaction.followup.send(
-                f"No {self.category} in the **{label}** range.",
-                ephemeral=True
-            )
-            return
+    lines = [f"{i+1}. {title}" for i, title in enumerate(filtered)]
 
-        lines = [f"{i+1}. {title}" for i, title in enumerate(filtered)]
+    chunks = []
+    current = []
+    length = 0
 
-        chunks = []
-        current = []
-        length = 0
-
-        for line in lines:
-            if length + len(line) + 1 > 1900:
-                chunks.append("\n".join(current))
-                current = [line]
-                length = len(line) + 1
-            else:
-                current.append(line)
-                length += len(line) + 1
-
-        if current:
+    for line in lines:
+        if length + len(line) + 1 > 1900:
             chunks.append("\n".join(current))
+            current = [line]
+            length = len(line) + 1
+        else:
+            current.append(line)
+            length += len(line) + 1
 
-        for idx, chunk in enumerate(chunks):
-            prefix = f"**{self.category.capitalize()} {label}**\n" if idx == 0 else ""
-            await interaction.followup.send(
-                prefix + f"```text\n{chunk}\n```",
-                ephemeral=True
-            )
+    if current:
+        chunks.append("\n".join(current))
+
+    for chunk in chunks:
+        await interaction.followup.send(
+            f"```text\n{chunk}\n```",
+            ephemeral=True
+        )
+
 
     # Row 0
     @discord.ui.button(label="0–9", style=discord.ButtonStyle.secondary, row=0)
