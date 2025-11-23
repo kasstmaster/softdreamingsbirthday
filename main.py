@@ -338,10 +338,10 @@ async def media_list(
     await view.send_initial(ctx)
 
 @bot.slash_command(
-    name="media_random",
+    name="random",
     description="Pick a random movie or TV show from the stored lists"
 )
-async def media_random(
+async def random(
     ctx: discord.ApplicationContext,
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
