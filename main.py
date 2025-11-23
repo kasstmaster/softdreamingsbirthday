@@ -238,7 +238,7 @@ class MediaPagerView(discord.ui.View):
         self._update_buttons_state()
         return f"{header}\n```text\n{body}\n```"
 
-    async def send_initial(self, ctx: discord.ApplicationContext):
+    async def send_initial(self, ctx: "discord.ApplicationContext"):
         content = self._build_page_content()
         await ctx.respond(content, view=self, ephemeral=True)
 
@@ -254,11 +254,26 @@ class MediaPagerView(discord.ui.View):
         content = self._build_page_content()
         await interaction.response.edit_message(content=content, view=self)
 
+# ────────────────────── AUTOCOMPLETE HELPER ──────────────────────
+
+async def request_title_autocomplete(ctx: "discord.AutocompleteContext"):
+    query = (ctx.value or "").lower()
+
+    if not movie_titles:
+        return []
+
+    if not query:
+        # First 25 movies if they haven't typed anything
+        return movie_titles[:25]
+
+    matches = [m for m in movie_titles if query in m.lower()]
+    return matches[:25]
+
 # ────────────────────── SLASH COMMANDS ──────────────────────
 
 @bot.slash_command(name="set", description="Set your birthday")
 async def set_birthday_self(
-    ctx: discord.ApplicationContext,
+    ctx: "discord.ApplicationContext",
     month: discord.Option(str, "Month", choices=MONTH_CHOICES, required=True),
     day: discord.Option(int, "Day", min_value=1, max_value=31, required=True),
 ):
@@ -272,7 +287,7 @@ async def set_birthday_self(
 
 @bot.slash_command(name="set_for", description="Set a birthday for another member")
 async def set_birthday_for(
-    ctx: discord.ApplicationContext,
+    ctx: "discord.ApplicationContext",
     member: discord.Option(discord.Member, "Member", required=True),
     month: discord.Option(str, "Month", choices=MONTH_CHOICES, required=True),
     day: discord.Option(int, "Day", min_value=1, max_value=31, required=True),
@@ -289,19 +304,22 @@ async def set_birthday_for(
     await ctx.respond(f"Birthday set for {member.mention} → `{mm_dd}`.", ephemeral=True)
 
 @bot.slash_command(name="birthdays", description="Show all server birthdays")
-async def birthdays_cmd(ctx):
+async def birthdays_cmd(ctx: "discord.ApplicationContext"):
     embed = await build_birthday_embed(ctx.guild)
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="say", description="Make the bot say something in this channel")
-async def say(ctx, message: discord.Option(str, "Message", required=True)):
+async def say(ctx: "discord.ApplicationContext", message: discord.Option(str, "Message", required=True)):
     if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
         return await ctx.respond("You need Administrator.", ephemeral=True)
     await ctx.channel.send(message)
     await ctx.respond("Sent!", ephemeral=True)
 
 @bot.slash_command(name="remove_for", description="Remove a birthday for another member")
-async def remove_birthday_for(ctx, member: discord.Option(discord.Member, "Member to remove birthday for", required=True)):
+async def remove_birthday_for(
+    ctx: "discord.ApplicationContext",
+    member: discord.Option(discord.Member, "Member to remove birthday for", required=True),
+):
     if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
         return await ctx.respond("You need Administrator.", ephemeral=True)
     data = await _load_storage_message()
@@ -316,8 +334,13 @@ async def remove_birthday_for(ctx, member: discord.Option(discord.Member, "Membe
 
 @bot.slash_command(name="request", description="Request a movie from the list for others to vote on")
 async def request_cmd(
-    ctx: discord.ApplicationContext,
-    title: discord.Option(str, "Movie title (must be in the list)", required=True),
+    ctx: "discord.ApplicationContext",
+    title: discord.Option(
+        str,
+        "Movie title (must be in the list)",
+        required=True,
+        autocomplete=request_title_autocomplete,
+    ),
 ):
     if MOVIE_REQUESTS_CHANNEL_ID == 0:
         return await ctx.respond("Movie requests channel is not configured.", ephemeral=True)
@@ -326,7 +349,6 @@ async def request_cmd(
     if not channel:
         return await ctx.respond("Configured movie requests channel not found.", ephemeral=True)
 
-    # Ensure the title is one of our stored movies (case-insensitive)
     if not movie_titles:
         return await ctx.respond(
             "No movies are currently loaded. Try again later.",
@@ -343,7 +365,6 @@ async def request_cmd(
             ephemeral=True,
         )
 
-    # Use the canonical stored title
     canon_title = canon_map[key]
 
     embed = discord.Embed(
@@ -365,24 +386,6 @@ async def request_cmd(
 
     await ctx.respond("Your request has been posted for voting.", ephemeral=True)
 
-@request_cmd.autocomplete("title")
-async def request_title_autocomplete(ctx: discord.AutocompleteContext):
-    # What the user has typed so far
-    query = (ctx.value or "").lower()
-
-    if not movie_titles:
-        return []
-
-    if not query:
-        # First 25 movies if they haven't typed anything
-        return movie_titles[:25]
-
-    # Filter movies that contain the typed text (case-insensitive)
-    matches = [m for m in movie_titles if query in m.lower()]
-
-    # Discord allows up to 25 results
-    return matches[:25]
-
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
@@ -390,7 +393,7 @@ async def request_title_autocomplete(ctx: discord.AutocompleteContext):
     description="Browse our available movies or TV shows"
 )
 async def list(
-    ctx: discord.ApplicationContext,
+    ctx: "discord.ApplicationContext",
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
     items = movie_titles if category == "movies" else tv_titles
@@ -405,19 +408,17 @@ async def list(
     description="Pick a random movie or TV show from the list"
 )
 async def media_random(
-    ctx: discord.ApplicationContext,
+    ctx: "discord.ApplicationContext",
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
     items = movie_titles if category == "movies" else tv_titles
 
-    # Still keep errors ephemeral (they're just for the command user)
     if not items:
         return await ctx.respond(f"No {category} stored yet.", ephemeral=True)
 
     choice_title = pyrandom.choice(items)
     kind = "movie" if category == "movies" else "show"
 
-    # public message
     await ctx.respond(f"🎲 Random {kind}: **{choice_title}**")
 
 @bot.slash_command(
@@ -425,11 +426,10 @@ async def media_random(
     description="Add a new movie or TV show to the stored lists"
 )
 async def media_add(
-    ctx: discord.ApplicationContext,
+    ctx: "discord.ApplicationContext",
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
     title: discord.Option(str, "Exact title to add", required=True),
 ):
-    # Admin / owner only
     if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
         return await ctx.respond("You need Administrator.", ephemeral=True)
 
