@@ -323,10 +323,10 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
-    name="media_list",
+    name="list",
     description="Browse stored movies or TV shows (ephemeral, paged)"
 )
-async def media_list(
+async def list(
     ctx: discord.ApplicationContext,
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
