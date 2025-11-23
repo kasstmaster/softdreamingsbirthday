@@ -314,8 +314,11 @@ async def remove_birthday_for(ctx, member: discord.Option(discord.Member, "Membe
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Removed birthday for {member.mention}.", ephemeral=True)
 
-@bot.slash_command(name="request", description="Request a movie or show for others to vote on")
-async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", required=True)):
+@bot.slash_command(name="request", description="Request a movie from the list for others to vote on")
+async def request_cmd(
+    ctx: discord.ApplicationContext,
+    title: discord.Option(str, "Movie title (must be in the list)", required=True),
+):
     if MOVIE_REQUESTS_CHANNEL_ID == 0:
         return await ctx.respond("Movie requests channel is not configured.", ephemeral=True)
 
@@ -323,8 +326,28 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
     if not channel:
         return await ctx.respond("Configured movie requests channel not found.", ephemeral=True)
 
+    # Ensure the title is one of our stored movies (case-insensitive)
+    if not movie_titles:
+        return await ctx.respond(
+            "No movies are currently loaded. Try again later.",
+            ephemeral=True,
+        )
+
+    canon_map = {t.lower(): t for t in movie_titles}
+    key = title.strip().lower()
+
+    if key not in canon_map:
+        return await ctx.respond(
+            "That movie is not in our library.\n"
+            "Use `/list movies` to browse available titles.",
+            ephemeral=True,
+        )
+
+    # Use the canonical stored title
+    canon_title = canon_map[key]
+
     embed = discord.Embed(
-        title=title,
+        title=canon_title,
         description=(
             f"Requested by {ctx.author.mention}\n\n"
             "**[REQUEST A TITLE](https://discord.com/channels/1205041211610501120/1440989357535395911/1440992347709243402)**"
@@ -341,6 +364,24 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
         pass
 
     await ctx.respond("Your request has been posted for voting.", ephemeral=True)
+
+@request_cmd.autocomplete("title")
+async def request_title_autocomplete(ctx: discord.AutocompleteContext):
+    # What the user has typed so far
+    query = (ctx.value or "").lower()
+
+    if not movie_titles:
+        return []
+
+    if not query:
+        # First 25 movies if they haven't typed anything
+        return movie_titles[:25]
+
+    # Filter movies that contain the typed text (case-insensitive)
+    matches = [m for m in movie_titles if query in m.lower()]
+
+    # Discord allows up to 25 results
+    return matches[:25]
 
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
