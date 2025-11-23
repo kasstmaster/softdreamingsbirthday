@@ -3,8 +3,28 @@ import json
 import asyncio
 from datetime import datetime
 
+# ───────────────────────── MONTH / DAY DROPDOWNS ─────────────────────────
+
+MONTH_CHOICES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+
+MONTH_TO_NUM = {
+    name: f"{i:02d}" for i, name in enumerate(MONTH_CHOICES, start=1)
+}
+
+def build_mm_dd(month_name: str, day: int) -> str | None:
+    """Convert 'November', 1 → '11-01'. Returns None if invalid."""
+    month_num = MONTH_TO_NUM.get(month_name)
+    if not month_num:
+        return None
+    if day < 1 or day > 31:
+        return None
+    return f"{month_num}-{day:02d}"
+
 import discord
-import random
+import random as pyrandom
 
 intents = discord.Intents.default()
 intents.members = True
@@ -116,13 +136,6 @@ async def initialize_media_lists():
         print("[Media] TV_STORAGE_CHANNEL_ID is 0 (shows disabled).")
 
 # ────────────────────── BIRTHDAY HELPERS ──────────────────────
-
-def normalize_date(date_str: str):
-    try:
-        dt = datetime.strptime(date_str, "%m-%d")
-        return dt.strftime("%m-%d")
-    except ValueError:
-        return None
 
 async def set_birthday(guild_id: int, user_id: int, mm_dd: str):
     data = await _load_storage_message()
@@ -243,25 +256,34 @@ class MediaPagerView(discord.ui.View):
 
 # ────────────────────── SLASH COMMANDS ──────────────────────
 
-@bot.slash_command(name="set", description="Set your birthday (MM-DD)")
-async def set_birthday_self(ctx, date: discord.Option(str, "Format: MM-DD", required=True)):
-    mm_dd = normalize_date(date)
+@bot.slash_command(name="set", description="Set your birthday")
+async def set_birthday_self(
+    ctx: discord.ApplicationContext,
+    month: discord.Option(str, "Month", choices=MONTH_CHOICES, required=True),
+    day: discord.Option(int, "Day", min_value=1, max_value=31, required=True),
+):
+    mm_dd = build_mm_dd(month, day)
     if not mm_dd:
-        return await ctx.respond("Invalid date. Use MM-DD.", ephemeral=True)
+        return await ctx.respond("Invalid date.", ephemeral=True)
+
     await set_birthday(ctx.guild.id, ctx.author.id, mm_dd)
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Your birthday has been set to `{mm_dd}`.", ephemeral=True)
 
-@bot.slash_command(name="set_for", description="Set a birthday for another member (MM-DD)")
-async def set_birthday_for(ctx,
+@bot.slash_command(name="set_for", description="Set a birthday for another member")
+async def set_birthday_for(
+    ctx: discord.ApplicationContext,
     member: discord.Option(discord.Member, "Member", required=True),
-    date: discord.Option(str, "Format: MM-DD", required=True),
+    month: discord.Option(str, "Month", choices=MONTH_CHOICES, required=True),
+    day: discord.Option(int, "Day", min_value=1, max_value=31, required=True),
 ):
     if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
         return await ctx.respond("You need Administrator.", ephemeral=True)
-    mm_dd = normalize_date(date)
+
+    mm_dd = build_mm_dd(month, day)
     if not mm_dd:
-        return await ctx.respond("Invalid date. Use MM-DD.", ephemeral=True)
+        return await ctx.respond("Invalid date.", ephemeral=True)
+
     await set_birthday(ctx.guild.id, member.id, mm_dd)
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Birthday set for {member.mention} → `{mm_dd}`.", ephemeral=True)
@@ -324,7 +346,7 @@ async def request_cmd(ctx, title: discord.Option(str, "Movie or show title", req
 
 @bot.slash_command(
     name="list",
-    description="Browse stored movies or TV shows (ephemeral, paged)"
+    description="Browse our available movies or TV shows"
 )
 async def list(
     ctx: discord.ApplicationContext,
@@ -339,9 +361,9 @@ async def list(
 
 @bot.slash_command(
     name="random",
-    description="Pick a random movie or TV show from the stored lists"
+    description="Pick a random movie or TV show from the list"
 )
-async def random(
+async def media_random(
     ctx: discord.ApplicationContext,
     category: discord.Option(str, "Which list?", choices=["movies", "shows"], required=True),
 ):
@@ -351,10 +373,10 @@ async def random(
     if not items:
         return await ctx.respond(f"No {category} stored yet.", ephemeral=True)
 
-    choice_title = random.choice(items)
+    choice_title = pyrandom.choice(items)
     kind = "movie" if category == "movies" else "show"
 
-    # ✅ PUBLIC message now (no `ephemeral=True`)
+    # public message
     await ctx.respond(f"🎲 Random {kind}: **{choice_title}**")
 
 @bot.slash_command(
