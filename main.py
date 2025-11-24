@@ -42,24 +42,6 @@ movie_titles: list[str] = []
 tv_titles: list[str] = []
 request_pool: dict[int, list[tuple[int, str]]] = {}
 
-# ────────────────────── HOLIDAY COLOR ROLES ──────────────────────
-HOLIDAY_ROLES = {
-    "christmas": {
-        1296591590940344330: 1442605535018094592,  # Owners → Grinch
-        1296586486635823247: 1442606609405841518,  # Original Members → Cranberry
-        1325384410975047735: 1442605476989894788,  # Members → Tinsel
-    },
-    "halloween": {
-        1296591590940344330: 1442607402678747227,  # Owners → Cauldron
-        1296586486635823247: 1442607334882021436,  # Original Members → Candy
-        1325384410975047735: 1442607365923930132,  # Members → Witchy
-    },
-}
-ALL_HOLIDAY_ROLE_IDS = {
-    1442605535018094592, 1442606609405841518, 1442605476989894788,
-    1442607402678747227, 1442607334882021436, 1442607365923930132
-}
-
 # ────────────────────── STORAGE HELPERS ──────────────────────
 async def initialize_storage_message():
     global storage_message_id
@@ -321,45 +303,56 @@ async def media_add(ctx, category: discord.Option(str, choices=["movies", "shows
         target.sort(key=str.lower)
     await ctx.respond(f"Added **{title}** to {category}.", ephemeral=True)
 
-# Holiday commands
+
+# ────────────────────── HOLIDAY COLOR ROLES (BY NAME – KEEPS YOUR PRETTY NAMES) ──────────────────────
+CHRISTMAS_ROLES = ["Grinch", "Cranberry", "Tinsel"]
+HALLOWEEN_ROLES = ["Cauldron", "Candy", "Witchy"]
+
+def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
+    name_lower = name.lower()
+    for role in guild.roles:
+        cleaned = role.name.replace("🎄", "").replace("🎃", "").replace("❄️", "").strip()
+        if cleaned.lower() == name_lower:
+            return role
+    return None
+
 @bot.slash_command(name="holiday_add")
 async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "halloween"])):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
-    mapping = HOLIDAY_ROLES[holiday]
-    count = 0
-    for base_id, color_id in mapping.items():
-        base = ctx.guild.get_role(base_id)
-        color = ctx.guild.get_role(color_id)
-        if not base or not color:
-            continue
-        async for member in ctx.guild.fetch_members(limit=None):
-            if base in member.roles and color not in member.roles:
-                try:
-                    await member.add_roles(color, reason=f"Holiday: {holiday}")
-                    count += 1
-                except:
-                    pass
-    await ctx.followup.send(f"Applied **{holiday.capitalize()}** theme to **{count}** members!", ephemeral=True)
+    roles = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
+    added = 0
+    for role_name in roles:
+        role = find_role_by_name(ctx.guild, role_name)
+        if role:
+            async for member in ctx.guild.fetch_members(limit=None):
+                if role not in member.roles:
+                    try:
+                        await member.add_roles(role, reason=f"{holiday.capitalize()} theme")
+                        added += 1
+                    except:
+                        pass
+    await ctx.followup.send(f"Applied **{holiday.capitalize()}** theme to **{added}** members! {'🎄' if holiday=='christmas' else '🎃'}", ephemeral=True)
 
 @bot.slash_command(name="holiday_remove")
 async def holiday_remove(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
-    count = 0
-    for role_id in ALL_HOLIDAY_ROLE_IDS:
-        role = ctx.guild.get_role(role_id)
+    removed = 0
+    for role_name in CHRISTMAS_ROLES + HALLOWEEN_ROLES:
+        role = find_role_by_name(ctx.guild, role_name)
         if role:
             async for member in ctx.guild.fetch_members(limit=None):
                 if role in member.roles:
                     try:
-                        await member.remove_roles(role, reason="Holiday ended")
-                        count += 1
+                        await member.remove_roles(role, reason="Holiday theme ended")
+                        removed += 1
                     except:
                         pass
-    await ctx.followup.send(f"Removed all holiday roles from **{count}** assignments.", ephemeral=True)
+    await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
+    
 
 # Admin say
 @bot.slash_command(name="say")
