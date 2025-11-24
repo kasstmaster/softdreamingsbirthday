@@ -274,15 +274,54 @@ async def request_title_autocomplete(ctx: "discord.AutocompleteContext"):
 
 # ────────────────────── SLASH COMMANDS ──────────────────────
 
+@bot.slash_command(name="commands", description="Quick reference of admin-only commands")
+async def commands(ctx: discord.ApplicationContext):
+    # Optional: hide from non-admins (uncomment if you want it truly private)
+    # if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+    #     return await ctx.respond("This command is only for staff.", ephemeral=True)
+
+    embed = discord.Embed(
+        title="Admin & Staff Commands",
+        description="Here are the commands only **Admins & Owner** can use:",
+        color=0x00e1ff
+    )
+
+    embed.add_field(
+        name="Birthdays",
+        value=(
+            "• </set_for:1440919374310408235> – Set a birthday for someone else\n"
+            "• </remove_for:1440954448468774922> – Remove a member's birthday"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="Movie Night",
+        value="• </random:1442017303230156963> – Force-pick & announce a random movie (clears pool)",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Holiday Themes",
+        value=(
+            "• </holiday_add:NEW> – Apply Christmas or Halloween color roles\n"
+            "• </holiday_remove:NEW> – Remove all holiday color roles from everyone"
+        ),
+        inline=False
+    )
+
+    embed.set_footer(text="You also have access to /say and /media_add • Bot by Soft Dreamings")
+
+    await ctx.respond(embed=embed, ephemeral=True)
+    
+
 @bot.slash_command(name="info", description="Show all features of the bot")
 async def info(ctx: discord.ApplicationContext):
     MEMBERS_ICON = "https://images-ext-1.discordapp.net/external/2i-PtcLgl_msR0VTT2mGn_5dtQiC9DK56PxR4uJfCLI/%3Fsize%3D1024/https/cdn.discordapp.com/avatars/1440914703894188122/ff746b98459152a0ba7c4eff5530cd9d.png?format=webp&quality=lossless&width=534&height=534"
-
     embed = discord.Embed(
         title="Members - Bot Features",
         color=0x00e1ff
     )
-
     # ───── Birthday Features ─────
     embed.add_field(
         name="Birthday Features",
@@ -297,7 +336,6 @@ async def info(ctx: discord.ApplicationContext):
         ),
         inline=False
     )
-
     # ───── Movie/TV Night Features ─────
     embed.add_field(
         name="Movie/TV Night Features",
@@ -311,7 +349,6 @@ async def info(ctx: discord.ApplicationContext):
         ),
         inline=False
     )
-
     # ───── Utility / Admin ─────
     embed.add_field(
         name="Utility / Admin",
@@ -321,10 +358,19 @@ async def info(ctx: discord.ApplicationContext):
         ),
         inline=False
     )
-
+    # ───── Holiday Themes (NEW!) ─────
+    embed.add_field(
+        name="Holiday Themes",
+        value=(
+            "• </holiday_add:NEW> – Instantly apply festive color roles (Christmas = Grinch/Cranberry/Tinsel | Halloween = Cauldron/Candy/Witchy)\n"
+            "• </holiday_remove:NEW> – Remove all holiday color roles from everyone in one click\n"
+            "Perfect for Christmas, Halloween, and future holidays!"
+        ),
+        inline=False
+    )
     embed.set_thumbnail(url=MEMBERS_ICON)
     embed.set_footer(text=f"• Bot by Soft Dreamings", icon_url=MEMBERS_ICON)
-    
+   
     await ctx.respond(embed=embed)
 
 
