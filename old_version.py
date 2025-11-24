@@ -304,9 +304,9 @@ async def media_add(ctx, category: discord.Option(str, choices=["movies", "shows
     await ctx.respond(f"Added **{title}** to {category}.", ephemeral=True)
 
 
-# ────────────────────── HOLIDAY COLOR ROLES (BY NAME – KEEPS YOUR PRETTY NAMES) ──────────────────────
-CHRISTMAS_ROLES = ["Grinch", "Cranberry", "Tinsel"]
-HALLOWEEN_ROLES = ["Cauldron", "Candy", "Witchy"]
+# ────────────────────── HOLIDAY COLOR ROLES (FINAL CORRECTED PAIRINGS) ──────────────────────
+CHRISTMAS_ROLES = {"Grinch": "Owner", "Cranberry": "Original Member", "Tinsel": "Member"}
+HALLOWEEN_ROLES = {"Cauldron": "Owner", "Candy": "Original Member", "Witchy": "Member"}
 
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
     name_lower = name.lower()
@@ -321,18 +321,18 @@ async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "h
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
-    roles = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
+    role_map = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
     added = 0
-    for role_name in roles:
-        role = find_role_by_name(ctx.guild, role_name)
-        if role:
-            async for member in ctx.guild.fetch_members(limit=None):
-                if role not in member.roles:
+    for color_name, base_keyword in role_map.items():
+        color_role = find_role_by_name(ctx.guild, color_name)
+        if not color_role: continue
+        async for member in ctx.guild.fetch_members(limit=None):
+            if any(base_keyword.lower() in r.name.lower() for r in member.roles):
+                if color_role not in member.roles:
                     try:
-                        await member.add_roles(role, reason=f"{holiday.capitalize()} theme")
+                        await member.add_roles(color_role, reason=f"{holiday.capitalize()} theme")
                         added += 1
-                    except:
-                        pass
+                    except: pass
     await ctx.followup.send(f"Applied **{holiday.capitalize()}** theme to **{added}** members! {'🎄' if holiday=='christmas' else '🎃'}", ephemeral=True)
 
 @bot.slash_command(name="holiday_remove")
@@ -341,16 +341,15 @@ async def holiday_remove(ctx):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
     removed = 0
-    for role_name in CHRISTMAS_ROLES + HALLOWEEN_ROLES:
-        role = find_role_by_name(ctx.guild, role_name)
+    for color_name in {**CHRISTMAS_ROLES, **HALLOWEEN_ROLES}:
+        role = find_role_by_name(ctx.guild, color_name)
         if role:
             async for member in ctx.guild.fetch_members(limit=None):
                 if role in member.roles:
                     try:
                         await member.remove_roles(role, reason="Holiday theme ended")
                         removed += 1
-                    except:
-                        pass
+                    except: pass
     await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
 
 # ────────────────────── DEAD CHAT ROLE (/color command) ──────────────────────
@@ -362,25 +361,23 @@ async def color_cycle(ctx):
         return await ctx.respond("This command is disabled on this server.", ephemeral=True)
 
     dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID)
-    if not dead_chat_role:
-        return await ctx.respond("Dead Chat role not found.", ephemeral=True)
-    if dead_chat_role not in ctx.author.roles:
+    if not dead_chat_role or dead_chat_role not in ctx.author.roles:
         return await ctx.respond("You need the Dead Chat role to use this command!", ephemeral=True)
 
     # List of your color roles (add/remove as you like)
     COLOR_ROLES = [
         "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink",
         "Lavender", "Mint", "Peach", "Coral", "Sky", "Rose", "Gold"
-        # ← put your exact color role names here
+        # ← Replace with your exact color role names if different
     ]
 
-    # Find current color roles the user has
-    current_colors = [r for r in ctx.author.roles if r.name in COLOR_ROLES]
-    await ctx.author.remove_roles(*current_colors, reason="Color cycle")
+    # Find current color role the user has
+    current_color = next((r for r in ctx.author.roles if r.name in COLOR_ROLES), None)
+    await ctx.author.remove_roles(*[r for r in ctx.author.roles if r.name in COLOR_ROLES], reason="Color cycle")
 
     # Pick next color (or first if none)
-    next_color_name = COLOR_ROLES[0] if not current_colors else \
-        COLOR_ROLES[(COLOR_ROLES.index(current_colors[0].name) + 1) % len(COLOR_ROLES)]
+    next_color_index = 0 if not current_color else (COLOR_ROLES.index(current_color.name) + 1) % len(COLOR_ROLES)
+    next_color_name = COLOR_ROLES[next_color_index]
 
     next_role = discord.utils.get(ctx.guild.roles, name=next_color_name)
     if next_role:
