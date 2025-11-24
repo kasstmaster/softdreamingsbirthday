@@ -288,6 +288,7 @@ async def set_birthday_self(
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Your birthday has been set to `{mm_dd}`.", ephemeral=True)
 
+
 @bot.slash_command(name="set_for", description="Set a birthday for another member")
 async def set_birthday_for(
     ctx: "discord.ApplicationContext",
@@ -306,10 +307,12 @@ async def set_birthday_for(
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Birthday set for {member.mention} → `{mm_dd}`.", ephemeral=True)
 
+
 @bot.slash_command(name="birthdays", description="Show all server birthdays")
 async def birthdays_cmd(ctx: "discord.ApplicationContext"):
     embed = await build_birthday_embed(ctx.guild)
     await ctx.respond(embed=embed, ephemeral=True)
+
 
 @bot.slash_command(name="say", description="Make the bot say something in this channel")
 async def say(ctx: "discord.ApplicationContext", message: discord.Option(str, "Message", required=True)):
@@ -317,6 +320,7 @@ async def say(ctx: "discord.ApplicationContext", message: discord.Option(str, "M
         return await ctx.respond("You need Administrator.", ephemeral=True)
     await ctx.channel.send(message)
     await ctx.respond("Sent!", ephemeral=True)
+
 
 @bot.slash_command(name="remove_for", description="Remove a birthday for another member")
 async def remove_birthday_for(
@@ -334,6 +338,7 @@ async def remove_birthday_for(
     await _save_storage_message(data)
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Removed birthday for {member.mention}.", ephemeral=True)
+
 
 @bot.slash_command(
     name="pick",
@@ -415,6 +420,7 @@ async def random_pick_cmd(ctx: "discord.ApplicationContext"):
         f"The pool has been cleared. Start a new round with `/pick`."
     )
 
+
 @bot.slash_command(
     name="pool",
     description="Show all movies currently in the pick pool"
@@ -448,6 +454,79 @@ async def pool_cmd(ctx: "discord.ApplicationContext"):
     )
 
     await ctx.respond(embed=embed, ephemeral=True)
+
+
+COLOR_NAME_MAP = {
+    "red":     0xFF0000,
+    "blue":    0x0000FF,
+    "green":   0x00FF00,
+    "purple":  0x800080,
+    "pink":    0xFFC0CB,
+    "yellow":  0xFFFF00,
+    "orange":  0xFFA500,
+    "teal":    0x008080,
+    "cyan":    0x00FFFF,
+    "magenta": 0xFF00FF,
+    "black":   0x000000,
+    "white":   0xFFFFFF,
+    "gray":    0x808080,
+    "grey":    0x808080,
+    "maroon":  0x800000,
+    "navy":    0x000080,
+    "lime":    0x32CD32,
+    "gold":    0xFFD700
+}
+
+@bot.slash_command(name="color", description="Change the Dead Chat role color")
+async def color(
+    ctx: discord.ApplicationContext,
+    color: discord.Option(str, "Hex or name (e.g. #ff0000, ff0000, red, pink)", required=True),
+):
+    if DEAD_CHAT_ROLE_ID == 0:
+        await ctx.respond("Dead Chat role is not configured.", ephemeral=True)
+        return
+
+    guild = ctx.guild
+    if guild is None:
+        await ctx.respond("This command can only be used in a server.", ephemeral=True)
+        return
+
+    role = guild.get_role(DEAD_CHAT_ROLE_ID)
+    if role is None:
+        await ctx.respond("Dead Chat role not found.", ephemeral=True)
+        return
+
+    member = ctx.author
+    if role not in member.roles:
+        await ctx.respond("You don't have the Dead Chat role.", ephemeral=True)
+        return
+
+    raw = color.strip().lstrip('#')
+
+    if raw in COLOR_NAME_MAP:
+        color_int = COLOR_NAME_MAP[raw]
+    else:
+        value = raw
+        if value.startswith("#"):
+            value = value[1:]
+        try:
+            color_int = int(value, 16)
+        except ValueError:
+            valid_names = ", ".join(sorted(COLOR_NAME_MAP.keys()))
+            await ctx.respond(
+                "Use a valid hex color like `#ff0000` / `ff0000` "
+                f"or one of these names: {valid_names}.",
+                ephemeral=True
+            )
+            return
+
+    try:
+        await role.edit(color=discord.Color(color_int), reason="Dead Chat color change")
+    except discord.Forbidden:
+        await ctx.respond("I don't have permission to edit that role.", ephemeral=True)
+        return
+
+    await ctx.respond(f"Updated {role.name} color.", ephemeral=True)
 
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
