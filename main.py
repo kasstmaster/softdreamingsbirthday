@@ -853,4 +853,92 @@ async def birthday_checker():
                             pass
         await asyncio.sleep(3600)
 
+
+# ────────────────────── QUESTION OF THE DAY (The Story Shack) ──────────────────────
+import requests
+from discord.ext import tasks, commands
+from datetime import time
+
+# CHANGE THESE:
+QOTD_CHANNEL_ID = 1207917070684004452   # Replace with your desired channel (e.g. general, qotd, etc.)
+QOTD_TIME = time(9, 0)                   # 9:00 AM server time (24h format). Change freely!
+
+class QOTDCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.daily_qotd.start()
+
+    def cog_unload(self):
+        self.daily_qotd.cancel()
+
+    @tasks.loop(time=QOTD_TIME)
+    async def daily_qotd(self):
+        channel = self.bot.get_channel(QOTD_CHANNEL_ID)
+        if not channel:
+            print(f"[QOTD] Channel {QOTD_CHANNEL_ID} not found!")
+            return
+
+        try:
+            # Fetch from The Story Shack
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(
+                "https://thestoryshack.com/tools/random-question-generator/",
+                headers=headers,
+                timeout=10
+            )
+            if response.status_code != 200:
+                print(f"[QOTD] Failed to fetch (status {response.status_code})")
+                return
+
+            # Extract the question from the <h2> tag inside the result div
+            text = response.text
+            start = text.find('<h2>') + 4
+            end = text.find('</h2>', start)
+            if start == 3 or end == -1:
+                print("[QOTD] Could not parse question")
+                return
+
+            question = text[start:end].strip()
+            if not question.endswith("?"):
+                question += "?"
+
+            # Pretty embed
+            embed = discord.Embed(
+                title="Question of the Day",
+                description=f"**{question}**",
+                color=0x9b59b6  # Purple vibe to match creative questions
+            )
+            embed.set_footer(text=f"{datetime.now().strftime('%B %d, %Y')} • Reply below!")
+            embed.set_thumbnail(url="https://thestoryshack.com/wp-content/uploads/2023/06/storyshack-favicon-150x150.png")
+
+            await channel.send(embed=embed)
+            print(f"[QOTD] Posted: {question}")
+
+        except Exception as e:
+            print(f"[QOTD] Error: {e}")
+
+    @daily_qotd.before_loop
+    async def before_qotd(self):
+        await self.bot.wait_until_ready()
+
+    @commands.slash_command(name="test_qotd", description="Manually trigger today's QOTD (admin only)")
+    @commands.has_permissions(administrator=True)
+    async def test_qotd(self, ctx):
+        await ctx.respond("Fetching a fresh question...", ephemeral=True)
+        await self.daily_qotd()
+
+# Add the cog when bot starts
+@bot.event
+async def on_ready():
+    print(f"{bot.user} is online (birthday bot).")
+    await initialize_storage_message()
+    await initialize_media_lists()
+    bot.loop.create_task(birthday_checker())
+    
+    # Add QOTD cog if not already added
+    if not bot.get_cog("QOTDCog"):
+        await bot.add_cog(QOTDCog(bot))
+    print("[QOTD] Question of the Day system loaded!")
+    
+
 bot.run(os.getenv("TOKEN"))
