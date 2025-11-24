@@ -33,6 +33,10 @@ MOVIE_REQUESTS_CHANNEL_ID = int(os.getenv("MOVIE_REQUESTS_CHANNEL_ID", "0"))
 MOVIE_STORAGE_CHANNEL_ID = int(os.getenv("MOVIE_STORAGE_CHANNEL_ID", "0"))
 TV_STORAGE_CHANNEL_ID = int(os.getenv("TV_STORAGE_CHANNEL_ID", "0"))
 
+# Dead Chat role (for /color)
+DEAD_CHAT_ROLE_ID = int(os.getenv("DEAD_CHAT_ROLE_ID", "0"))
+DEAD_CHAT_ROLE_NAME = os.getenv("DEAD_CHAT_ROLE_NAME", "Dead Chat")
+
 # Storage
 storage_message_id: int | None = None
 movie_titles: list[str] = []
@@ -138,14 +142,18 @@ async def update_birthday_list_message(guild: discord.Guild):
 
 # ────────────────────── MEDIA PAGER VIEW ──────────────────────
 PAGE_SIZE = 25
+
 class MediaPagerView(discord.ui.View):
     def __init__(self, category: str, page: int = 0):
         super().__init__(timeout=120)
         self.category = category
         self.page = page
 
-    def _items(self): return movie_titles if self.category == "movies" else tv_titles
-    def _max_page(self): return max(0, (len(self._items()) - 1) // PAGE_SIZE)
+    def _items(self):
+        return movie_titles if self.category == "movies" else tv_titles
+
+    def _max_page(self):
+        return max(0, (len(self._items()) - 1) // PAGE_SIZE)
 
     def _build_content(self):
         items = self._items()
@@ -157,7 +165,7 @@ class MediaPagerView(discord.ui.View):
         slice_items = items[start:start + PAGE_SIZE]
         lines = [f"{i+1}. {t}" for i, t in enumerate(slice_items, start+1)]
         header = f"{self.category.capitalize()} • Page {self.page+1}/{max_page+1} ({len(items)} total)"
-        return f"{header}\n```text\n{' '.join(lines) if lines else 'Empty'}\n```"
+        return f"{header}\n```text\n" + "\n".join(lines if lines else ["Empty"]) + "\n```"
 
     async def send_initial(self, ctx):
         await ctx.respond(self._build_content(), view=self, ephemeral=True)
@@ -182,10 +190,38 @@ async def movie_autocomplete(ctx: discord.AutocompleteContext):
 @bot.slash_command(name="info", description="Show all bot features")
 async def info(ctx):
     embed = discord.Embed(title="Members - Bot Features", color=0x00e1ff)
-    embed.add_field(name="Birthday Features", value="• </set:1440919374310408234> – Set your birthday\n• </set_for:1440919374310408235> – Admin set\n• </remove_for:1440954448468774922> – Admin remove\n• </birthdays:1440919374310408236> – View list\n• Auto role + public list + welcome DM", inline=False)
-    embed.add_field(name="Movie/TV Night", value="• </list:1442017846589653014> movies/shows\n• </pick:1442305353030176800>\n• </pool:1442311836497350656>\n• </random:1442017303230156963>\n• </media_add:1441698665981939825> (admin)", inline=False)
-    embed.add_field(name="Utility / Admin", value="• </say:1440927430209703986> (admin)\n• </color:1442416784635334668> (Dead Chat role)", inline=False)
-    embed.add_field(name="Holiday Themes", value="• </holiday_add:1442616885802832115> – Apply Christmas/Halloween colors\n• </holiday_remove:NEW> – Remove all holiday roles", inline=False)
+    embed.add_field(
+        name="Birthday Features",
+        value=(
+            "• </set:1440919374310408234> – Set your birthday\n"
+            "• </set_for:1440919374310408235> – Admin set\n"
+            "• </remove_for:1440954448468774922> – Admin remove\n"
+            "• </birthdays:1440919374310408236> – View list\n"
+            "• Auto role + public list + welcome DM"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Movie/TV Night",
+        value=(
+            "• </list:1442017846589653014> movies/shows\n"
+            "• </pick:1442305353030176800>\n"
+            "• </pool:1442311836497350656>\n"
+            "• </random:1442017303230156963>\n"
+            "• </media_add:1441698665981939825> (admin)"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Utility / Admin",
+        value="• </say:1440927430209703986> (admin)\n• </color:1442416784635334668> (Dead Chat role)",
+        inline=False,
+    )
+    embed.add_field(
+        name="Holiday Themes",
+        value="• </holiday_add:1442616885802832115> – Apply Christmas/Halloween colors\n• </holiday_remove:NEW> – Remove all holiday roles",
+        inline=False,
+    )
     embed.set_footer(text="Bot by Soft Dreamings")
     await ctx.respond(embed=embed)
 
@@ -194,18 +230,42 @@ async def commands(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     embed = discord.Embed(title="Admin Commands", color=0xff6b6b)
-    embed.add_field(name="Birthdays", value="• </set_for:1440919374310408235>\n• </remove_for:1440954448468774922>", inline=False)
-    embed.add_field(name="Movie Night", value="• </random:1442017303230156963> – Force pick", inline=False)
-    embed.add_field(name="Holidays", value="• </holiday_add:1442616885802832115>\n• </holiday_remove:1442616885802832116>", inline=False)
+    embed.add_field(
+        name="Birthdays",
+        value="• </set_for:1440919374310408235>\n• </remove_for:1440954448468774922>",
+        inline=False,
+    )
+    embed.add_field(
+        name="Movie Night",
+        value="• </random:1442017303230156963> – Force pick",
+        inline=False,
+    )
+    embed.add_field(
+        name="Holidays",
+        value="• </holiday_add:1442616885802832115>\n• </holiday_remove:1442616885802832116>",
+        inline=False,
+    )
     embed.set_footer(text="Also: /say • /media_add")
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="membercommands", description="What regular members can use")
 async def membercommands(ctx):
     embed = discord.Embed(title="Member Commands", color=0x00e1ff)
-    embed.add_field(name="Birthdays", value="• </set:1440919374310408234>\n• </birthdays:1440919374310408236>", inline=False)
-    embed.add_field(name="Movie Night", value="• </list:1442017846589653014> movies/shows\n• </pick:1442305353030176800>\n• </pool:1442311836497350656>", inline=False)
-    embed.add_field(name="Fun", value="• </color:1442416784635334668> (if you have Dead Chat)", inline=False)
+    embed.add_field(
+        name="Birthdays",
+        value="• </set:1440919374310408234>\n• </birthdays:1440919374310408236>",
+        inline=False,
+    )
+    embed.add_field(
+        name="Movie Night",
+        value="• </list:1442017846589653014> movies/shows\n• </pick:1442305353030176800>\n• </pool:1442311836497350656>",
+        inline=False,
+    )
+    embed.add_field(
+        name="Fun",
+        value="• </color:1442416784635334668> (if you have Dead Chat)",
+        inline=False,
+    )
     embed.add_field(name="Full list?", value="Use **/info**!", inline=False)
     await ctx.respond(embed=embed, ephemeral=True)
 
@@ -264,8 +324,14 @@ async def pool(ctx):
     pool = request_pool.get(ctx.guild.id, [])
     if not pool:
         return await ctx.respond("Pool is empty.", ephemeral=True)
-    lines = [f"• **{t}** — {ctx.guild.get_member(u).mention if ctx.guild.get_member(u) else '<@'+str(u)+'>'}" for u, t in pool]
-    await ctx.respond(embed=discord.Embed(title="Current Pool", description="\n".join(lines), color=0x2e2f33), ephemeral=True)
+    lines = [
+        f"• **{t}** — {ctx.guild.get_member(u).mention if ctx.guild.get_member(u) else '<@'+str(u)+'>'}"
+        for u, t in pool
+    ]
+    await ctx.respond(
+        embed=discord.Embed(title="Current Pool", description="\n".join(lines), color=0x2e2f33),
+        ephemeral=True,
+    )
 
 @bot.slash_command(name="random")
 async def random_pick(ctx):
@@ -300,7 +366,6 @@ async def media_add(ctx, category: discord.Option(str, choices=["movies", "shows
         target.sort(key=str.lower)
     await ctx.respond(f"Added **{title}** to {category}.", ephemeral=True)
 
-
 # ────────────────────── HOLIDAY COLOR ROLES (FINAL CORRECTED PAIRINGS) ──────────────────────
 CHRISTMAS_ROLES = {"Grinch": "Owner", "Cranberry": "Original Member", "Tinsel": "Member"}
 HALLOWEEN_ROLES = {"Cauldron": "Owner", "Candy": "Original Member", "Witchy": "Member"}
@@ -322,15 +387,20 @@ async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "h
     added = 0
     for color_name, base_keyword in role_map.items():
         color_role = find_role_by_name(ctx.guild, color_name)
-        if not color_role: continue
+        if not color_role:
+            continue
         async for member in ctx.guild.fetch_members(limit=None):
             if any(base_keyword.lower() in r.name.lower() for r in member.roles):
                 if color_role not in member.roles:
                     try:
                         await member.add_roles(color_role, reason=f"{holiday.capitalize()} theme")
                         added += 1
-                    except: pass
-    await ctx.followup.send(f"Applied **{holiday.capitalize()}** theme to **{added}** members! {'🎄' if holiday=='christmas' else '🎃'}", ephemeral=True)
+                    except:
+                        pass
+    await ctx.followup.send(
+        f"Applied **{holiday.capitalize()}** theme to **{added}** members! {'🎄' if holiday=='christmas' else '🎃'}",
+        ephemeral=True,
+    )
 
 @bot.slash_command(name="holiday_remove")
 async def holiday_remove(ctx):
@@ -346,31 +416,39 @@ async def holiday_remove(ctx):
                     try:
                         await member.remove_roles(role, reason="Holiday theme ended")
                         removed += 1
-                    except: pass
+                    except:
+                        pass
     await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
 
-# ────────────────────── DEAD CHAT ROLE (/color command) ──────────────────────
-DEAD_CHAT_ROLE_ID = int(os.getenv("DEAD_CHAT_ROLE_ID", "0"))  # Set this in your .env or leave 0 to disable
-
+# ────────────────────── DEAD CHAT ROLE (/color + /deadchat) ──────────────────────
 @bot.slash_command(name="color", description="Cycle through fun colors (Dead Chat role required)")
 async def color_cycle(ctx):
-    if DEAD_CHAT_ROLE_ID == 0:
-        return await ctx.respond("This command is disabled on this server.", ephemeral=True)
+    # Resolve Dead Chat role by ID first, then by name
+    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
+    if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
+        dead_chat_role = discord.utils.get(ctx.guild.roles, name=DEAD_CHAT_ROLE_NAME)
 
-    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID)
-    if not dead_chat_role or dead_chat_role not in ctx.author.roles:
+    if dead_chat_role is None:
+        return await ctx.respond(
+            "Dead Chat role is not configured correctly. Check DEAD_CHAT_ROLE_ID / DEAD_CHAT_ROLE_NAME.",
+            ephemeral=True,
+        )
+
+    if dead_chat_role not in ctx.author.roles:
         return await ctx.respond("You need the Dead Chat role to use this command!", ephemeral=True)
 
-    # List of your color roles (add/remove as you like)
     COLOR_ROLES = [
         "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink",
         "Lavender", "Mint", "Peach", "Coral", "Sky", "Rose", "Gold"
-        # ← Replace with your exact color role names if different
     ]
 
     # Find current color role the user has
     current_color = next((r for r in ctx.author.roles if r.name in COLOR_ROLES), None)
-    await ctx.author.remove_roles(*[r for r in ctx.author.roles if r.name in COLOR_ROLES], reason="Color cycle")
+
+    # Remove all color roles from the user
+    remove_roles = [r for r in ctx.author.roles if r.name in COLOR_ROLES]
+    if remove_roles:
+        await ctx.author.remove_roles(*remove_roles, reason="Color cycle")
 
     # Pick next color (or first if none)
     next_color_index = 0 if not current_color else (COLOR_ROLES.index(current_color.name) + 1) % len(COLOR_ROLES)
@@ -382,7 +460,28 @@ async def color_cycle(ctx):
         await ctx.respond(f"Color changed to **{next_color_name}**!", ephemeral=True)
     else:
         await ctx.respond("Color role not found.", ephemeral=True)
-        
+
+@bot.slash_command(name="deadchat", description="Give or remove the Dead Chat role from a member (admin only)")
+async def deadchat(ctx, member: discord.Member):
+    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+        return await ctx.respond("Admin only.", ephemeral=True)
+
+    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
+    if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
+        dead_chat_role = discord.utils.get(ctx.guild.roles, name=DEAD_CHAT_ROLE_NAME)
+
+    if dead_chat_role is None:
+        return await ctx.respond(
+            "Dead Chat role is not configured correctly. Check DEAD_CHAT_ROLE_ID / DEAD_CHAT_ROLE_NAME.",
+            ephemeral=True,
+        )
+
+    if dead_chat_role in member.roles:
+        await member.remove_roles(dead_chat_role, reason="Dead Chat toggle")
+        await ctx.respond(f"Removed Dead Chat role from {member.mention}.", ephemeral=True)
+    else:
+        await member.add_roles(dead_chat_role, reason="Dead Chat toggle")
+        await ctx.respond(f"Gave Dead Chat role to {member.mention}.", ephemeral=True)
 
 # Admin say
 @bot.slash_command(name="say")
@@ -403,7 +502,10 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     try:
-        await member.send("Welcome! Add your birthday here → https://discord.com/channels/1205041211610501120/1440989357535395911/1440989655515271248")
+        await member.send(
+            "Welcome! Add your birthday here → "
+            "https://discord.com/channels/1205041211610501120/1440989357535395911/1440989655515271248"
+        )
     except:
         pass
 
