@@ -582,6 +582,93 @@ async def color(
 
     await ctx.respond(f"Updated {role.name} color.", ephemeral=True)
 
+# ────────────────────── HOLIDAY COLOR ROLES ──────────────────────
+HOLIDAY_ROLES = {
+    "christmas": {
+        1296591590940344330: 1442605535018094592,  # Owners → Grinch
+        1296586486635823247: 1442606609405841518,  # Original Members → Cranberry
+        1325384410975047735: 1442605476989894788,  # Members → Tinsel
+    },
+    "halloween": {
+        1296591590940344330: 1442607402678747227,  # Owners → Cauldron
+        1296586486635823247: 1442607334882021436,  # Original Members → Candy
+        1325384410975047735: 1442607365923930132,  # Members → Witchy
+    },
+}
+
+# All holiday color role IDs (used for /holiday_remove)
+ALL_HOLIDAY_ROLE_IDS = {
+    1442605535018094592,  # Grinch
+    1442606609405841518,  # Cranberry
+    1442605476989894788,  # Tinsel
+    1442607402678747227,  # Cauldron
+    1442607334882021436,  # Candy
+    1442607365923930132,  # Witchy
+}
+
+@bot.slash_command(name="holiday_add", description="Apply holiday color roles (Admin only)")
+async def holiday_add(
+    ctx: discord.ApplicationContext,
+    holiday: discord.Option(
+        str,
+        "Which holiday theme?",
+        choices=["christmas", "halloween"],
+        required=True
+    )
+):
+    if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
+        return await ctx.respond("You need Administrator or be the server owner.", ephemeral=True)
+
+    await ctx.defer(ephemeral=True)
+
+    mapping = HOLIDAY_ROLES[holiday]
+    added_count = 0
+
+    for base_role_id, holiday_role_id in mapping.items():
+        base_role = ctx.guild.get_role(base_role_id)
+        holiday_role = ctx.guild.get_role(holiday_role_id)
+        if not base_role or not holiday_role:
+            continue
+
+        async for member in ctx.guild.fetch_members(limit=None):
+            if base_role in member.roles and holiday_role not in member.roles:
+                try:
+                    await member.add_roles(holiday_role, reason=f"Holiday theme: {holiday.capitalize()}")
+                    added_count += 1
+                except discord.Forbidden:
+                    pass  # bot lacks perms
+                except discord.HTTPException:
+                    pass
+
+    await ctx.followup.send(f"✅ **{holiday.capitalize()}** theme applied! Added holiday color roles to **{added_count}** members.", ephemeral=True)
+
+
+@bot.slash_command(name="holiday_remove", description="Remove ALL holiday color roles from everyone (Admin only)")
+async def holiday_remove(ctx: discord.ApplicationContext):
+    if not ctx.author.guild_permissions.administrator and ctx.guild.owner_id != ctx.author.id:
+        return await ctx.respond("You need Administrator or be the server owner.", ephemeral=True)
+
+    await ctx.defer(ephemeral=True)
+
+    removed_count = 0
+
+    for holiday_role_id in ALL_HOLIDAY_ROLE_IDS:
+        role = ctx.guild.get_role(holiday_role_id)
+        if not role:
+            continue
+
+        async for member in ctx.guild.fetch_members(limit=None):
+            if role in member.roles:
+                try:
+                    await member.remove_roles(role, reason="Holiday theme removed")
+                    removed_count += 1
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    pass
+
+    await ctx.followup.send(f"🧹 All holiday color roles removed from **{removed_count}** role assignments.", ephemeral=True)
+
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
