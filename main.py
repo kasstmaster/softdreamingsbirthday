@@ -200,7 +200,6 @@ async def commands(ctx):
     embed.add_field(name="Birthdays", value="• </set_for:1440919374310408235>\n• </remove_for:1440954448468774922>", inline=False)
     embed.add_field(name="Movie Night", value="• </random:1442017303230156963> – Force pick", inline=False)
     embed.add_field(name="Holidays", value="• </holiday_add:1442616885802832115>\n• </holiday_remove:1442616885802832116>", inline=False)
-    embed.set_footer(text="Also: /say • /media_add")
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="membercommands", description="What regular members can use")
