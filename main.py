@@ -382,7 +382,6 @@ async def membercommands(ctx: discord.ApplicationContext):
         name="Birthdays",
         value=(
             "• </set:1440919374310408234> – Add your own birthday (month + day)\n"
-            "• </birthdays:1440919374310408236> – See everyone’s birthdays"
         ),
         inline=False
     )
@@ -401,12 +400,6 @@ async def membercommands(ctx: discord.ApplicationContext):
     embed.add_field(
         name="Fun & Chat",
         value="• </color:1442416784635334668> – Change Dead Chat role color (if you have the role)",
-        inline=False
-    )
-
-    embed.add_field(
-        name="Need the full list?",
-        value="Type **/info** for everything the bot can do!",
         inline=False
     )
 
