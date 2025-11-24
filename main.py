@@ -43,7 +43,6 @@ TV_STORAGE_CHANNEL_ID    = int(os.getenv("TV_STORAGE_CHANNEL_ID", "0"))
 
 storage_message_id: int | None = None
 
-# In-memory media lists (loaded from channels on startup)
 movie_titles: list[str] = []
 tv_titles: list[str] = []
 
