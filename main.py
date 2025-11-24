@@ -808,19 +808,6 @@ async def media_add(
 # ────────────────────── EVENTS ──────────────────────
 
 @bot.event
-async def on_ready():
-    print(f"{bot.user} is online (birthday bot).")
-    await initialize_storage_message()
-    await initialize_media_lists()
-    bot.loop.create_task(birthday_checker())
-    
-    # Load the QOTD cog (this registers /test_qotd and starts the daily task)
-    if not bot.get_cog("QOTDCog"):
-        await bot.add_cog(QOTDCog(bot))
-    
-    print("[QOTD] Question of the Day system loaded!")
-
-@bot.event
 async def on_member_join(member):
     try:
         await member.send(
@@ -913,8 +900,10 @@ async def on_ready():
     await initialize_media_lists()
     bot.loop.create_task(birthday_checker())
     
-    daily_qotd.start()          # ← starts the daily posting
-    print("[QOTD] Daily question system started – /test_qotd is ready!")
+    # Start the daily QOTD task
+    daily_qotd.start()
+    
+    print("[QOTD] System ready — /test_qotd is live and daily post scheduled for 9 AM!")
     
 
 bot.run(os.getenv("TOKEN"))
