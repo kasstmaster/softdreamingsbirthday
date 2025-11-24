@@ -352,7 +352,43 @@ async def holiday_remove(ctx):
                     except:
                         pass
     await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
-    
+
+# ────────────────────── DEAD CHAT ROLE (/color command) ──────────────────────
+DEAD_CHAT_ROLE_ID = int(os.getenv("DEAD_CHAT_ROLE_ID", "0"))  # Set this in your .env or leave 0 to disable
+
+@bot.slash_command(name="color", description="Cycle through fun colors (Dead Chat role required)")
+async def color_cycle(ctx):
+    if DEAD_CHAT_ROLE_ID == 0:
+        return await ctx.respond("This command is disabled on this server.", ephemeral=True)
+
+    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID)
+    if not dead_chat_role:
+        return await ctx.respond("Dead Chat role not found.", ephemeral=True)
+    if dead_chat_role not in ctx.author.roles:
+        return await ctx.respond("You need the Dead Chat role to use this command!", ephemeral=True)
+
+    # List of your color roles (add/remove as you like)
+    COLOR_ROLES = [
+        "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink",
+        "Lavender", "Mint", "Peach", "Coral", "Sky", "Rose", "Gold"
+        # ← put your exact color role names here
+    ]
+
+    # Find current color roles the user has
+    current_colors = [r for r in ctx.author.roles if r.name in COLOR_ROLES]
+    await ctx.author.remove_roles(*current_colors, reason="Color cycle")
+
+    # Pick next color (or first if none)
+    next_color_name = COLOR_ROLES[0] if not current_colors else \
+        COLOR_ROLES[(COLOR_ROLES.index(current_colors[0].name) + 1) % len(COLOR_ROLES)]
+
+    next_role = discord.utils.get(ctx.guild.roles, name=next_color_name)
+    if next_role:
+        await ctx.author.add_roles(next_role, reason="Color cycle")
+        await ctx.respond(f"Color changed to **{next_color_name}**!", ephemeral=True)
+    else:
+        await ctx.respond("Color role not found.", ephemeral=True)
+        
 
 # Admin say
 @bot.slash_command(name="say")
