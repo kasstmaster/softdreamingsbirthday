@@ -415,6 +415,40 @@ async def random_pick_cmd(ctx: "discord.ApplicationContext"):
         f"The pool has been cleared. Start a new round with `/pick`."
     )
 
+@bot.slash_command(
+    name="pool",
+    description="Show all movies currently in the pick pool"
+)
+async def pool_cmd(ctx: "discord.ApplicationContext"):
+    if not ctx.guild:
+        return await ctx.respond("This command can only be used in a server.", ephemeral=True)
+
+    guild_id = ctx.guild.id
+    pool = request_pool.get(guild_id, [])
+
+    if not pool:
+        return await ctx.respond(
+            "The pool is currently empty.\nUse `/pick` to add movies.",
+            ephemeral=True,
+        )
+
+    # Build a list of entries: "Movie Title — Requested by @User"
+    lines = []
+    for user_id, title in pool:
+        member = ctx.guild.get_member(user_id)
+        requester = member.mention if member else f"<@{user_id}>"
+        lines.append(f"• **{title}** — added by {requester}")
+
+    description = "\n".join(lines)
+
+    embed = discord.Embed(
+        title="🎬 Current Pick Pool",
+        description=description,
+        color=0x2e2f33
+    )
+
+    await ctx.respond(embed=embed, ephemeral=True)
+
 # ────────────────────── MEDIA COMMANDS ──────────────────────
 
 @bot.slash_command(
