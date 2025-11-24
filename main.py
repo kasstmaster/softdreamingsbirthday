@@ -188,7 +188,7 @@ async def info(ctx):
     embed.add_field(name="Birthday Features", value="• </set:1440919374310408234> – Set your birthday\n• </set_for:1440919374310408235> – Admin set\n• </remove_for:1440954448468774922> – Admin remove\n• </birthdays:1440919374310408236> – View list\n• Auto role + public list + welcome DM", inline=False)
     embed.add_field(name="Movie/TV Night", value="• </list:1442017846589653014> movies/shows\n• </pick:1442305353030176800>\n• </pool:1442311836497350656>\n• </random:1442017303230156963>\n• </media_add:1441698665981939825> (admin)", inline=False)
     embed.add_field(name="Utility / Admin", value="• </say:1440927430209703986> (admin)\n• </color:1442416784635334668> (Dead Chat role)", inline=False)
-    embed.add_field(name="Holiday Themes", value="• </holiday_add:NEW> – Apply Christmas/Halloween colors\n• </holiday_remove:NEW> – Remove all holiday roles", inline=False)
+    embed.add_field(name="Holiday Themes", value="• </holiday_add:1442616885802832115> – Apply Christmas/Halloween colors\n• </holiday_remove:NEW> – Remove all holiday roles", inline=False)
     embed.set_footer(text="Bot by Soft Dreamings")
     await ctx.respond(embed=embed)
 
@@ -199,7 +199,7 @@ async def commands(ctx):
     embed = discord.Embed(title="Admin Commands", color=0xff6b6b)
     embed.add_field(name="Birthdays", value="• </set_for:1440919374310408235>\n• </remove_for:1440954448468774922>", inline=False)
     embed.add_field(name="Movie Night", value="• </random:1442017303230156963> – Force pick", inline=False)
-    embed.add_field(name="Holidays", value="• </holiday_add:NEW>\n• </holiday_remove:NEW>", inline=False)
+    embed.add_field(name="Holidays", value="• </holiday_add:1442616885802832115>\n• </holiday_remove:1442616885802832116>", inline=False)
     embed.set_footer(text="Also: /say • /media_add")
     await ctx.respond(embed=embed, ephemeral=True)
 
