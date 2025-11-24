@@ -304,8 +304,6 @@ async def commands(ctx: discord.ApplicationContext):
         inline=False
     )
 
-    embed.set_footer(text="You also have access to /say and /media_add • Bot by Soft Dreamings")
-
     await ctx.respond(embed=embed, ephemeral=True)
     
 
@@ -400,8 +398,6 @@ async def membercommands(ctx: discord.ApplicationContext):
         value="• </color:1442416784635334668> – Change Dead Chat role color (if you have the role)",
         inline=False
     )
-
-    embed.set_footer(text="Having trouble? Just ask in the server • Bot by Soft Dreamings")
 
     await ctx.respond(embed=embed, ephemeral=True)
 
