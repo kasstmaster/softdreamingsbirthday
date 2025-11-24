@@ -886,10 +886,10 @@ async def before_qotd():
 
 # ←←← THIS IS THE MAGIC COMMAND THAT WILL DEFINITELY SHOW UP ←←←
 @bot.slash_command(name="test_qotd", description="Post a QOTD right now (admin only)")
-@commands.has_permissions(administrator=True)
-async def test_qotd(ctx):
+@discord.default_permissions(administrator=True)
+async def test_qotd(ctx: discord.ApplicationContext):
     await ctx.respond("Fetching question…", ephemeral=True)
-    await daily_qotd()   # just calls the same function
+    await daily_qotd()
 
 # Start the daily task
 @bot.event
