@@ -283,7 +283,7 @@ async def info(ctx: discord.ApplicationContext):
 
     # ───── Birthday Features ─────
     embed.add_field(
-        name="🎂 Birthday Features",
+        name="Birthday Features",
         value=(
             "• </set:1440919374310408234> – Let members set their own birthday (month + day)\n"
             "• </set_for:1440919374310408235> – Admins can set someone else’s birthday\n"
@@ -298,7 +298,7 @@ async def info(ctx: discord.ApplicationContext):
 
     # ───── Movie/TV Night Features ─────
     embed.add_field(
-        name="🎬 Movie/TV Night Features",
+        name="Movie/TV Night Features",
         value=(
             "• Stores separate movie and TV show libraries (loaded from dedicated channels)\n"
             "• </list:1442017846589653014> movies or /list shows – Browse the full library with paginated view\n"
@@ -312,7 +312,7 @@ async def info(ctx: discord.ApplicationContext):
 
     # ───── Utility / Admin ─────
     embed.add_field(
-        name="🔧 Utility / Admin",
+        name="Utility / Admin",
         value=(
             "• </say:1440927430209703986> – Make the bot speak in the current channel (admin only)\n"
             "• </color:1442416784635334668> – Lets members with the “Dead Chat” role change that role’s color (hex or named colors)"
