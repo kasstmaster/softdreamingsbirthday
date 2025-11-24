@@ -276,7 +276,6 @@ async def commands(ctx: discord.ApplicationContext):
 
     embed = discord.Embed(
         title="Admin & Staff Commands",
-        description="Here are the commands only **Admins & Owner** can use:",
         color=0x00e1ff
     )
 
@@ -369,8 +368,7 @@ async def info(ctx: discord.ApplicationContext):
 @bot.slash_command(name="membercommands", description="Quick list of commands members can use")
 async def membercommands(ctx: discord.ApplicationContext):
     embed = discord.Embed(
-        title="Member Commands",
-        description="Here’s everything **you** can use! Just type any of these in Discord:",
+        title="Commands",
         color=0x00e1ff
     )
 
@@ -385,8 +383,8 @@ async def membercommands(ctx: discord.ApplicationContext):
     embed.add_field(
         name="Movie & TV Night",
         value=(
-            "• </list:1442017846589653014> movies Browse the movie list\n"
-            "• </list:1442017846589653014> shows Browse the TV show list\n"
+            "• </list:1442017846589653014> movies - Browse the movie list\n"
+            "• </list:1442017846589653014> shows - Browse the TV show list\n"
             "• </pick:1442305353030176800> – Add a movie to tonight’s voting pool\n"
             "• </pool:1442311836497350656> – See what’s in the current pool"
         ),
