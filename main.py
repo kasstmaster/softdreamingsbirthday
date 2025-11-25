@@ -489,7 +489,7 @@ async def set_bot_avatar_from_url(url: str):
 
 @bot.slash_command(
     name="holiday_add",
-    description="Add a holiday theme (Christmas or Halloween) to all matching members."
+    description="Apply a holiday theme to the server"
 )
 async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "halloween"])):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
@@ -524,7 +524,7 @@ async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "h
 
 @bot.slash_command(
     name="holiday_remove",
-    description="Remove all holiday theme roles from everyone."
+    description="Remove the holiday theme from the server"
 )
 async def holiday_remove(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
