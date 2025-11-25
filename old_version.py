@@ -420,10 +420,24 @@ async def holiday_remove(ctx):
                         pass
     await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
 
-# ────────────────────── DEAD CHAT ROLE (/color + /deadchat) ──────────────────────
-@bot.slash_command(name="color", description="Cycle through fun colors (Dead Chat role required)")
+
+# ────────────────────── DEAD CHAT ROLE – CHANGE ROLE COLOR ONLY ──────────────────────
+
+# Colors the Dead Chat role will cycle through (change or reorder however you like)
+DEAD_CHAT_COLORS = [
+    discord.Color.red(),
+    discord.Color.orange(),
+    discord.Color.gold(),
+    discord.Color.green(),
+    discord.Color.blue(),
+    discord.Color.purple(),
+    discord.Color.magenta(),
+    discord.Color.teal(),
+]
+
+@bot.slash_command(name="color", description="Change the server-wide color of the Dead Chat role")
 async def color_cycle(ctx):
-    # Resolve Dead Chat role by ID first, then by name
+    # 1) Resolve the Dead Chat role
     dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
     if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
         dead_chat_role = discord.utils.get(ctx.guild.roles, name=DEAD_CHAT_ROLE_NAME)
@@ -434,54 +448,41 @@ async def color_cycle(ctx):
             ephemeral=True,
         )
 
+    # 2) Only allow people who HAVE Dead Chat to use this
     if dead_chat_role not in ctx.author.roles:
         return await ctx.respond("You need the Dead Chat role to use this command!", ephemeral=True)
 
-    COLOR_ROLES = [
-        "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink",
-        "Lavender", "Mint", "Peach", "Coral", "Sky", "Rose", "Gold"
-    ]
+    # 3) Find current color index
+    colors = DEAD_CHAT_COLORS
+    current_index = None
+    for i, c in enumerate(colors):
+        if c.value == dead_chat_role.color.value:
+            current_index = i
+            break
 
-    # Find current color role the user has
-    current_color = next((r for r in ctx.author.roles if r.name in COLOR_ROLES), None)
-
-    # Remove all color roles from the user
-    remove_roles = [r for r in ctx.author.roles if r.name in COLOR_ROLES]
-    if remove_roles:
-        await ctx.author.remove_roles(*remove_roles, reason="Color cycle")
-
-    # Pick next color (or first if none)
-    next_color_index = 0 if not current_color else (COLOR_ROLES.index(current_color.name) + 1) % len(COLOR_ROLES)
-    next_color_name = COLOR_ROLES[next_color_index]
-
-    next_role = discord.utils.get(ctx.guild.roles, name=next_color_name)
-    if next_role:
-        await ctx.author.add_roles(next_role, reason="Color cycle")
-        await ctx.respond(f"Color changed to **{next_color_name}**!", ephemeral=True)
+    # If current color not in our list, start at the first color
+    if current_index is None:
+        next_index = 0
     else:
-        await ctx.respond("Color role not found.", ephemeral=True)
+        next_index = (current_index + 1) % len(colors)
 
-@bot.slash_command(name="deadchat", description="Give or remove the Dead Chat role from a member (admin only)")
-async def deadchat(ctx, member: discord.Member):
-    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
-        return await ctx.respond("Admin only.", ephemeral=True)
+    next_color = colors[next_index]
 
-    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
-    if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
-        dead_chat_role = discord.utils.get(ctx.guild.roles, name=DEAD_CHAT_ROLE_NAME)
-
-    if dead_chat_role is None:
+    # 4) Edit the role color (affects everyone with Dead Chat)
+    try:
+        await dead_chat_role.edit(color=next_color, reason="Dead Chat color cycle")
+    except discord.Forbidden:
         return await ctx.respond(
-            "Dead Chat role is not configured correctly. Check DEAD_CHAT_ROLE_ID / DEAD_CHAT_ROLE_NAME.",
+            "I don't have permission to edit the Dead Chat role. "
+            "Make sure my bot role is above Dead Chat and has Manage Roles.",
             ephemeral=True,
         )
 
-    if dead_chat_role in member.roles:
-        await member.remove_roles(dead_chat_role, reason="Dead Chat toggle")
-        await ctx.respond(f"Removed Dead Chat role from {member.mention}.", ephemeral=True)
-    else:
-        await member.add_roles(dead_chat_role, reason="Dead Chat toggle")
-        await ctx.respond(f"Gave Dead Chat role to {member.mention}.", ephemeral=True)
+    await ctx.respond(
+        f"Changed **Dead Chat** role color (step {next_index + 1}/{len(colors)} in the cycle).",
+        ephemeral=True,
+    )
+
 
 # Admin say
 @bot.slash_command(name="say")
