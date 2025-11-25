@@ -446,6 +446,33 @@ def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
     return None
 
 
+async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
+    if not url:
+        return
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return
+                data = await resp.read()
+
+        # Bot icon
+        try:
+            await bot.user.edit(avatar=data)
+        except:
+            pass
+
+        # Server icon
+        try:
+            await guild.edit(icon=data)
+        except:
+            pass
+
+    except:
+        pass
+
+
 async def set_bot_avatar_from_url(url: str):
     if not url:
         return
@@ -488,9 +515,9 @@ async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "h
         ephemeral=True,
     )
 
-    # Change bot icon to match holiday
+    # ---- NEW ICON CHANGE ----
     icon_url = CHRISTMAS_ICON_URL if holiday == "christmas" else HALLOWEEN_ICON_URL
-    await set_bot_avatar_from_url(icon_url)
+    await apply_icon_to_bot_and_server(ctx.guild, icon_url)
 
 @bot.slash_command(name="holiday_remove")
 async def holiday_remove(ctx):
@@ -510,13 +537,10 @@ async def holiday_remove(ctx):
                     except:
                         pass
 
-    await ctx.followup.send(
-        f"Removed all holiday roles from **{removed}** members.",
-        ephemeral=True,
-    )
+    await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
 
-    # Reset bot icon back to default
-    await set_bot_avatar_from_url(DEFAULT_ICON_URL)
+    # ---- NEW ICON RESET ----
+    await apply_icon_to_bot_and_server(ctx.guild, DEFAULT_ICON_URL)
 
 # ────────────────────── DEAD CHAT ROLE – CHANGE ROLE COLOR ONLY ──────────────────────
 @bot.slash_command(name="color", description="Change the server-wide color of the Dead Chat role")
