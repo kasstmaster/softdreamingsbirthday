@@ -232,7 +232,7 @@ async def info(ctx):
     embed.add_field(
         name="Holiday Themes",
         value="• </holiday_add:1442616885802832115> – Apply Christmas/Halloween colors\n"
-              "• </holiday_remove:NEW> – Remove all holiday roles",
+              "• </holiday_remove:1442616885802832116> – Remove all holiday roles",
         inline=False,
     )
     embed.set_footer(text="Bot by Soft Dreamings")
