@@ -200,43 +200,90 @@ async def movie_autocomplete(ctx: discord.AutocompleteContext):
 
 # ────────────────────── COMMANDS ──────────────────────
 @bot.slash_command(name="info", description="Show all bot features")
-async def info(ctx):
-    embed = discord.Embed(title="Members - Bot Features", color=0x00e1ff)
+async def info(ctx: discord.ApplicationContext):
+    # Same icon/logo as the other bot
+    MEMBERS_ICON = "https://images-ext-1.discordapp.net/external/2i-PtcLgl_msR0VTT2mGn_5dtQiC9DK56PxR4uJfCLI/%3Fsize%3D1024/https/cdn.discordapp.com/avatars/1440914703894188122/ff746b98459152a0ba7c4eff5530cd9d.png?format=webp&quality=lossless&width=534&height=534"
+
+    embed = discord.Embed(
+        title="Members - Bot Features",
+        description="Here's everything I can do in this server!",
+        color=0x00e1ff,  # keep this bot's cyan color
+    )
+
     embed.add_field(
-        name="Birthday Features",
+        name="Birthday System",
         value=(
-            "• </set:1440919374310408234> – Set your birthday\n"
-            "• </set_for:1440919374310408235> – Admin set\n"
-            "• </remove_for:1440954448468774922> – Admin remove\n"
-            "• </birthdays:1440919374310408236> – View list\n"
-            "• Auto role + public list + welcome DM"
+            "• Members can set their birthday with </set:1440919374310408234>\n"
+            "• Admins can set birthdays for others with </set_for:1440919374310408235>\n"
+            "• Admins can remove birthdays with </remove_for:1440954448468774922>\n"
+            "• </birthdays:1440919374310408236> shows the full birthday list\n"
+            "• Auto-updated public birthday list message\n"
+            "• Birthday role is given on your day and removed afterward\n"
+            "• New members get a welcome DM with a link to add their birthday"
         ),
         inline=False,
     )
+
     embed.add_field(
-        name="Movie/TV Night",
+        name="Movie & TV Night",
         value=(
-            "• </list:1442017846589653014> movies/shows\n"
-            "• </pick:1442305353030176800>\n"
-            "• </pool:1442311836497350656>\n"
-            "• </random:1442017303230156963>\n"
-            "• </media_add:1441698665981939825> (admin)"
+            "• Maintains a server-wide library of movies and TV shows\n"
+            "• </list:1442017846589653014> – Browse movies or shows (paged list)\n"
+            "• </pick:1442305353030176800> – Add your movie pick to the pool\n"
+            "• </pool:1442311836497350656> – See the current request pool\n"
+            "• </random:1442017303230156963> – Randomly pick a title from the pool and clear it\n"
+            "• </media_add:1441698665981939825> – Admins can add new movies/shows to the library"
         ),
         inline=False,
     )
-    embed.add_field(
-        name="Utility / Admin",
-        value="• </say:1440927430209703986> (admin)\n• </color:1442666939842433125> (Dead Chat role)",
-        inline=False,
-    )
+
     embed.add_field(
         name="Holiday Themes",
-        value="• </holiday_add:1442616885802832115> – Apply Christmas/Halloween colors\n"
-              "• </holiday_remove:1442616885802832116> – Remove all holiday roles",
+        value=(
+            "• </holiday_add:1442616885802832115> – Apply Christmas or Halloween color roles\n"
+            "  ┣ Matches special roles (Owner / Original Member / Member)\n"
+            "  ┗ Gives themed roles like **Grinch**, **Cranberry**, **Tinsel**, **Cauldron**, **Candy**, **Witchy**\n"
+            "• </holiday_remove:1442616885802832116> – Remove all holiday color roles from everyone"
+        ),
         inline=False,
     )
-    embed.set_footer(text="Bot by Soft Dreamings")
+
+    embed.add_field(
+        name="Dead Chat Role Color Cycle",
+        value=(
+            "• </color:1442666939842433125> – Changes the color of the **Dead Chat** role\n"
+            "• Only people who already have the Dead Chat role can use it\n"
+            "• Cycles through a set of bright colors for everyone with that role\n"
+            "• Uses either the configured role ID or fallback name to find the role"
+        ),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Member & Admin Utilities",
+        value=(
+            "• </say:1440927430209703986> – Admins can make the bot say a message in any channel\n"
+            "• </commands:1442748488480364594> – Quick reference for admin-only commands\n"
+            "• </membercommands:1442748488480364595> – Shows everything regular members can use"
+        ),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Automatic Tasks",
+        value=(
+            "• Loads birthday data and media lists when the bot comes online\n"
+            "• Checks birthdays every hour and updates the Birthday role automatically\n"
+            "• Sends a birthday-list link DM to new members when they join"
+        ),
+        inline=False,
+    )
+
+    embed.set_thumbnail(url=MEMBERS_ICON)
+    embed.set_footer(text="• Bot by Soft Dreamings", icon_url=MEMBERS_ICON)
+
     await ctx.respond(embed=embed)
+    
 
 @bot.slash_command(name="commands", description="Admin-only command reference")
 async def commands(ctx):
