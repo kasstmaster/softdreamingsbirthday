@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import aiohttp
 from datetime import datetime
 
 import discord
@@ -48,6 +49,10 @@ DEAD_CHAT_COLORS = [
     discord.Color.magenta(),
     discord.Color.teal(),
 ]
+
+CHRISTMAS_ICON_URL = os.getenv("CHRISTMAS_ICON_URL", "")
+HALLOWEEN_ICON_URL = os.getenv("HALLOWEEN_ICON_URL", "")
+DEFAULT_ICON_URL   = os.getenv("DEFAULT_ICON_URL", "")
 
 # Storage
 storage_message_id: int | None = None
@@ -440,13 +445,30 @@ def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
             return role
     return None
 
+
+async def set_bot_avatar_from_url(url: str):
+    if not url:
+        return
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return
+                data = await resp.read()
+        await bot.user.edit(avatar=data)
+    except Exception:
+        pass
+
+
 @bot.slash_command(name="holiday_add")
 async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "halloween"])):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
+
     role_map = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
     added = 0
+
     for color_name, base_keyword in role_map.items():
         color_role = find_role_by_name(ctx.guild, color_name)
         if not color_role:
@@ -459,17 +481,23 @@ async def holiday_add(ctx, holiday: discord.Option(str, choices=["christmas", "h
                         added += 1
                     except:
                         pass
+
     await ctx.followup.send(
         f"Applied **{holiday.capitalize()}** theme to **{added}** members! "
         f"{'🎄' if holiday == 'christmas' else '🎃'}",
         ephemeral=True,
     )
 
+    # Change bot icon to match holiday
+    icon_url = CHRISTMAS_ICON_URL if holiday == "christmas" else HALLOWEEN_ICON_URL
+    await set_bot_avatar_from_url(icon_url)
+
 @bot.slash_command(name="holiday_remove")
 async def holiday_remove(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     await ctx.defer(ephemeral=True)
+
     removed = 0
     for color_name in {**CHRISTMAS_ROLES, **HALLOWEEN_ROLES}:
         role = find_role_by_name(ctx.guild, color_name)
@@ -481,7 +509,14 @@ async def holiday_remove(ctx):
                         removed += 1
                     except:
                         pass
-    await ctx.followup.send(f"Removed all holiday roles from **{removed}** members.", ephemeral=True)
+
+    await ctx.followup.send(
+        f"Removed all holiday roles from **{removed}** members.",
+        ephemeral=True,
+    )
+
+    # Reset bot icon back to default
+    await set_bot_avatar_from_url(DEFAULT_ICON_URL)
 
 # ────────────────────── DEAD CHAT ROLE – CHANGE ROLE COLOR ONLY ──────────────────────
 @bot.slash_command(name="color", description="Change the server-wide color of the Dead Chat role")
