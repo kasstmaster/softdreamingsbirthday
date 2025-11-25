@@ -290,7 +290,7 @@ async def info(ctx: discord.ApplicationContext):
     await ctx.respond(embed=embed)
     
 
-@bot.slash_command(name="commands", description="Admin-only command reference")
+@bot.slash_command(name="commands", description="Admin / Announcer commands")
 async def commands(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
@@ -337,7 +337,10 @@ async def membercommands(ctx):
     await ctx.respond(embed=embed, ephemeral=True)
 
 # Birthday commands
-@bot.slash_command(name="set")
+@bot.slash_command(
+    name="set",
+    description="Share your birthday with the server"
+)
 async def set_birthday_self(ctx, month: discord.Option(str, choices=MONTH_CHOICES), day: int):
     mm_dd = build_mm_dd(month, day)
     if not mm_dd:
@@ -346,7 +349,10 @@ async def set_birthday_self(ctx, month: discord.Option(str, choices=MONTH_CHOICE
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Birthday set to `{mm_dd}`!", ephemeral=True)
 
-@bot.slash_command(name="set_for")
+@bot.slash_command(
+    name="set_for",
+    description="Add a birthday for a member"
+)
 async def set_for(ctx, member: discord.Member, month: discord.Option(str, choices=MONTH_CHOICES), day: int):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
@@ -357,7 +363,10 @@ async def set_for(ctx, member: discord.Member, month: discord.Option(str, choice
     await update_birthday_list_message(ctx.guild)
     await ctx.respond(f"Set {member.mention}'s birthday to `{mm_dd}`", ephemeral=True)
 
-@bot.slash_command(name="remove_for")
+@bot.slash_command(
+    name="remove_for",
+    description="Remove a members birthday"
+)
 async def remove_for(ctx, member: discord.Member):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
@@ -375,7 +384,10 @@ async def birthdays_cmd(ctx):
     await ctx.respond(embed=await build_birthday_embed(ctx.guild), ephemeral=True)
 
 # Movie commands
-@bot.slash_command(name="pick")
+@bot.slash_command(
+    name="pick",
+    description="Pick a movie to add to the pool"
+)
 async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete)):
     if not movie_titles:
         return await ctx.respond("Movie list not loaded.", ephemeral=True)
@@ -400,7 +412,10 @@ async def pool(ctx):
         ephemeral=True,
     )
 
-@bot.slash_command(name="random")
+@bot.slash_command(
+    name="random",
+    description="The bot will choose a random movie from the pool"
+)
 async def random_pick(ctx):
     pool = request_pool.get(ctx.guild.id, [])
     if not pool:
@@ -408,9 +423,14 @@ async def random_pick(ctx):
     user_id, title = pyrandom.choice(pool)
     request_pool[ctx.guild.id] = []
     member = ctx.guild.get_member(user_id)
-    await ctx.respond(f"Random Pick: **{title}**\nRequested by {member.mention if member else '<@'+str(user_id)+'>'}")
+    await ctx.respond(
+        f"Random Pick: **{title}**\nRequested by {member.mention if member else '<@'+str(user_id)+'>'}"
+    )
 
-@bot.slash_command(name="list")
+@bot.slash_command(
+    name="list",
+    description="View the list of movies & shows"
+)
 async def list_media(ctx, category: discord.Option(str, choices=["movies", "shows"])):
     items = movie_titles if category == "movies" else tv_titles
     if not items:
@@ -552,7 +572,7 @@ async def holiday_remove(ctx):
 
 
 # ────────────────────── DEAD CHAT ROLE – CHANGE ROLE COLOR ONLY ──────────────────────
-@bot.slash_command(name="color", description="Change the server-wide color of the Dead Chat role")
+@bot.slash_command(name="color", description="Change the color of the Dead Chat role")
 async def color_cycle(ctx):
     # Resolve the Dead Chat role: ID first, then name as fallback
     dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
