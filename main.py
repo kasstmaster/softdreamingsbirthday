@@ -226,7 +226,7 @@ async def info(ctx):
     )
     embed.add_field(
         name="Utility / Admin",
-        value="• </say:1440927430209703986> (admin)\n• </color:1442416784635334668> (Dead Chat role)",
+        value="• </say:1440927430209703986> (admin)\n• </color:1442666939842433125> (Dead Chat role)",
         inline=False,
     )
     embed.add_field(
@@ -278,7 +278,7 @@ async def membercommands(ctx):
     )
     embed.add_field(
         name="Fun",
-        value="• </color:1442416784635334668> (if you have Dead Chat)",
+        value="• </color:1442666939842433125> (if you have Dead Chat)",
         inline=False,
     )
     embed.add_field(name="Full list?", value="Use **/info**!", inline=False)
