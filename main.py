@@ -247,7 +247,7 @@ async def info(ctx: discord.ApplicationContext):
         value=(
             "• </holiday_add:1442616885802832115> – Apply a holiday server theme\n"
             "  ┣ Matches special roles (Owner / Original Member / Member)\n"
-            "  ┗ Gives themed roles like **Grinch**, **Cranberry**, **Tinsel**, **Cauldron**, **Candy**, **Witchy**\n"
+            "  ┗ Gives themed roles like **Grinch**, **Cranberry**, **lights**, **Cauldron**, **Candy**, **Witchy**\n"
             "• </holiday_remove:1442616885802832116> – Remove the holiday server theme"
         ),
         inline=False,
@@ -458,7 +458,7 @@ async def media_add(ctx, category: discord.Option(str, choices=["movies", "shows
     await ctx.respond(f"Added **{title}** to {category}.", ephemeral=True)
 
 # ────────────────────── HOLIDAY COLOR ROLES (FINAL CORRECTED PAIRINGS) ──────────────────────
-CHRISTMAS_ROLES = {"Cranberry": "Owner", "Tinsel": "Original Member", "Grinch": "Member", "Christmas": "Bots"}
+CHRISTMAS_ROLES = {"Cranberry": "Owner", "lights": "Original Member", "Grinch": "Member", "Christmas": "Bots"}
 HALLOWEEN_ROLES = {"Cauldron": "Owner", "Candy": "Original Member", "Witchy": "Member", "Halloween": "Bots"}
 
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
