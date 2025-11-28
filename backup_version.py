@@ -3,9 +3,10 @@ import json
 import asyncio
 import aiohttp
 from datetime import datetime
-
 import discord
 import random as pyrandom
+import gspread
+from google.oauth2.service_account import Credentials
 
 # ───────────────────────── MONTH / DAY DROPDOWNS ─────────────────────────
 MONTH_CHOICES = [
@@ -202,6 +203,87 @@ async def movie_autocomplete(ctx: discord.AutocompleteContext):
     query = (ctx.value or "").lower()
     matches = [m for m in movie_titles if query in m.lower()]
     return matches[:25] or movie_titles[:25]
+
+
+# ────────────────────── QUESTION OF THE DAY (Google Sheets) ──────────────────────
+creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+creds = Credentials.from_service_account_info(
+    creds_dict,
+    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+)
+gc = gspread.authorize(creds)
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+QOTD_CHANNEL_ID = int(os.getenv("QOTD_CHANNEL_ID", "0"))
+QOTD_TIME_HOUR = int(os.getenv("QOTD_TIME_HOUR", "10"))  # UTC hour
+
+async def get_qotd_sheet_and_tab():
+    sh = gc.open_by_key(SHEET_ID)
+    today = datetime.utcnow()
+    if 10 <= today.month <= 11:      # Oct & Nov → Fall Season
+        tab = "Fall Season"
+    elif today.month == 12:          # Dec → Christmas
+        tab = "Christmas"
+    else:
+        tab = "Regular"
+    return sh.worksheet(tab), tab
+
+async def post_daily_qotd():
+    if QOTD_CHANNEL_ID == 0:
+        return
+    channel = bot.get_channel(QOTD_CHANNEL_ID)
+    if not channel:
+        return
+
+    worksheet, season = await get_qotd_sheet_and_tab()
+    all_vals = worksheet.get_all_values()
+    if len(all_vals) < 2:
+        return  # empty sheet
+
+    questions = all_vals[1:]  # skip header row
+    unused = [row for row in questions if len(row) < 2 or not row[1].strip()]
+
+    if not unused:  # all used → reshuffle
+        worksheet.update("B2:B", [[""] for _ in range(len(questions))])
+        unused = questions
+
+    chosen = random.choice(unused)
+    question = chosen[0].strip()
+
+    # Seasonal styling
+    colors = {"Regular": 0x9b59b6, "Fall Season": 0xe67e22, "Christmas": 0x00ff00}
+    emojis = {"Regular": "Question of the Day", "Fall Season": "Fall Question", "Christmas": "Christmas Question"}
+
+    embed = discord.Embed(
+        title=f"{emojis.get(season, 'Question of the Day')} Question of the Day",
+        description=f"**{question}**",
+        color=colors.get(season, 0x9b59b6)
+    )
+    embed.set_footer(text=f"{season} • Reply below!")
+    await channel.send(embed=embed)
+
+    # Mark as used
+    row_idx = questions.index(chosen) + 2
+    worksheet.update(f"B{row_idx}", [[f"Used {datetime.utcnow().strftime('%Y-%m-%d')}"]])
+
+async def qotd_scheduler():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        now = datetime.utcnow()
+        if now.hour == QOTD_TIME_HOUR and now.minute < 5:
+            try:
+                await post_daily_qotd()
+            except Exception as e:
+                print(f"QOTD Error: {e}")
+        await asyncio.sleep(300)
+
+# Instant test command (admin only)
+@bot.slash_command(name="qotd_now", description="Post today's QOTD immediately (admin only)")
+async def qotd_now(ctx):
+    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+        return await ctx.respond("Admin only", ephemeral=True)
+    await ctx.defer(ephemeral=True)
+    await post_daily_qotd()
+    await ctx.followup.send("QOTD posted!", ephemeral=True)
 
 # ────────────────────── COMMANDS ──────────────────────
 @bot.slash_command(name="info", description="Show all bot features")
@@ -639,6 +721,8 @@ async def on_ready():
     await initialize_storage_message()
     await initialize_media_lists()
     bot.loop.create_task(birthday_checker())
+    bot.loop.create_task(qotd_scheduler())
+    print("QOTD scheduler started!")
 
 @bot.event
 async def on_member_join(member):
