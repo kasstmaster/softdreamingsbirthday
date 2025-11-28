@@ -25,18 +25,36 @@ intents = discord.Intents.default()
 intents.members = True
 bot = discord.Bot(intents=intents)
 
+# Safe integer environment variable loader
+def _env_int(var_name: str, default: int) -> int:
+    value = os.getenv(var_name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        print(f"[WARNING] Invalid value for {var_name}: {value!r} — using default {default}")
+        return default
+
 # ───────────────────────── CONFIG ─────────────────────────
-BIRTHDAY_ROLE_ID = int(os.getenv("BIRTHDAY_ROLE_ID", "1217937235840598026"))
-BIRTHDAY_STORAGE_CHANNEL_ID = int(os.getenv("BIRTHDAY_STORAGE_CHANNEL_ID", "1440912334813134868"))
-BIRTHDAY_LIST_CHANNEL_ID = 1440989357535395911
-BIRTHDAY_LIST_MESSAGE_ID = 1440989655515271248
+BIRTHDAY_ROLE_ID            = _env_int("BIRTHDAY_ROLE_ID", 1217937235840598026)
+BIRTHDAY_STORAGE_CHANNEL_ID = _env_int("BIRTHDAY_STORAGE_CHANNEL_ID", 1440912334813134868)
+BIRTHDAY_LIST_CHANNEL_ID    = 1440989357535395911
+BIRTHDAY_LIST_MESSAGE_ID    = 1440989655515271248
+MOVIE_REQUESTS_CHANNEL_ID   = _env_int("MOVIE_REQUESTS_CHANNEL_ID", 0)
+MOVIE_STORAGE_CHANNEL_ID    = _env_int("MOVIE_STORAGE_CHANNEL_ID", 0)
+TV_STORAGE_CHANNEL_ID       = _env_int("TV_STORAGE_CHANNEL_ID", 0)
+DEAD_CHAT_ROLE_ID           = _env_int("DEAD_CHAT_ROLE_ID", 0)
+DEAD_CHAT_ROLE_NAME         = os.getenv("DEAD_CHAT_ROLE_NAME", "Dead Chat")
 
-MOVIE_REQUESTS_CHANNEL_ID = int(os.getenv("MOVIE_REQUESTS_CHANNEL_ID", "0"))
-MOVIE_STORAGE_CHANNEL_ID = int(os.getenv("MOVIE_STORAGE_CHANNEL_ID", "0"))
-TV_STORAGE_CHANNEL_ID = int(os.getenv("TV_STORAGE_CHANNEL_ID", "0"))
+# Holiday icons (these are just strings, safe as-is)
+CHRISTMAS_ICON_URL          = os.getenv("CHRISTMAS_ICON_URL", "")
+HALLOWEEN_ICON_URL          = os.getenv("HALLOWEEN_ICON_URL", "")
+DEFAULT_ICON_URL            = os.getenv("DEFAULT_ICON_URL", "")
 
-DEAD_CHAT_ROLE_ID = int(os.getenv("DEAD_CHAT_ROLE_ID", "0"))
-DEAD_CHAT_ROLE_NAME = os.getenv("DEAD_CHAT_ROLE_NAME", "Dead Chat")
+# QOTD settings
+QOTD_CHANNEL_ID             = _env_int("QOTD_CHANNEL_ID", 0)
+QOTD_TIME_HOUR              = _env_int("QOTD_TIME_HOUR", 10)
 
 # Colors the Dead Chat role will cycle through
 DEAD_CHAT_COLORS = [
@@ -205,26 +223,49 @@ async def movie_autocomplete(ctx: discord.AutocompleteContext):
 
 
 # ────────────────────── QUESTION OF THE DAY (Google Sheets) ──────────────────────
-creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-creds = Credentials.from_service_account_info(
-    creds_dict,
-    scopes=["https://www.googleapis.com/auth/spreadsheets"]
-)
-gc = gspread.authorize(creds)
+gc = None
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 QOTD_CHANNEL_ID = int(os.getenv("QOTD_CHANNEL_ID", "0"))
 QOTD_TIME_HOUR = int(os.getenv("QOTD_TIME_HOUR", "10"))  # UTC hour
 
+async def init_gspread():
+    global gc
+    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    if not creds_json:
+        print("GOOGLE_CREDENTIALS not found in environment!")
+        return False
+    try:
+        creds_dict = json.loads(creds_json)
+        creds = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        gc = gspread.authorize(creds)
+        print("Google Sheets connected successfully!")
+        return True
+    except Exception as e:
+        print(f"Failed to connect to Google Sheets: {e}")
+        return False
+
 async def get_qotd_sheet_and_tab():
+    if gc is None:
+        await init_gspread()
+    if gc is None:
+        return None, None
     sh = gc.open_by_key(SHEET_ID)
     today = datetime.utcnow()
-    if 10 <= today.month <= 11:      # Oct & Nov → Fall Season
+    if 10 <= today.month <= 11:
         tab = "Fall Season"
-    elif today.month == 12:          # Dec → Christmas
+    elif today.month == 12:
         tab = "Christmas"
     else:
         tab = "Regular"
-    return sh.worksheet(tab), tab
+    try:
+        return sh.worksheet(tab), tab
+    except gspread.exceptions.WorksheetNotFound:
+        print(f"Worksheet '{tab}' not found! Falling back to 'Regular'")
+        return sh.worksheet("Regular"), "Regular"
+
 
 async def post_daily_qotd():
     if QOTD_CHANNEL_ID == 0:
@@ -234,9 +275,14 @@ async def post_daily_qotd():
         return
 
     worksheet, season = await get_qotd_sheet_and_tab()
+    if worksheet is None:
+        print("QOTD skipped: Google Sheets not connected or worksheet missing")
+        return
+
     all_vals = worksheet.get_all_values()
     if len(all_vals) < 2:
-        return  # empty sheet
+        print("QOTD skipped: sheet is empty")
+        return
 
     questions = all_vals[1:]  # skip header row
     unused = [row for row in questions if len(row) < 2 or not row[1].strip()]
@@ -245,7 +291,7 @@ async def post_daily_qotd():
         worksheet.update("B2:B", [[""] for _ in range(len(questions))])
         unused = questions
 
-    chosen = random.choice(unused)
+    chosen = pyrandom.choice(unused)
     question = chosen[0].strip()
 
     # Seasonal styling
@@ -721,7 +767,8 @@ async def on_ready():
     await initialize_media_lists()
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
-    print("QOTD scheduler started!")
+    await init_gspread()
+    print("QOTD scheduler started + Google Sheets ready!")
 
 @bot.event
 async def on_member_join(member):
