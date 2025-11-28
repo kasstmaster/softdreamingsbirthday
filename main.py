@@ -291,7 +291,7 @@ async def post_daily_qotd():
         worksheet.update("B2:B", [[""] for _ in range(len(questions))])
         unused = questions
 
-    chosen = random.choice(unused)
+    chosen = pyrandom.choice(unused)
     question = chosen[0].strip()
 
     # Seasonal styling
