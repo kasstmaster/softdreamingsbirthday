@@ -218,10 +218,10 @@ async def info(ctx: discord.ApplicationContext):
     embed.add_field(
         name="Birthday System",
         value=(
-            "• Members can set their birthday with </set:1440919374310408234>\n"
-            "• Admins can set birthdays for others with </set_for:1440919374310408235>\n"
-            "• Admins can remove birthdays with </remove_for:1440954448468774922>\n"
-            "• </birthdays:1440919374310408236> shows the full birthday list\n"
+            "• </set:1440919374310408234> - Members can set their birthday\n"
+            "• </set_for:1440919374310408235> - Admins can set birthdays for others\n"
+            "• </remove_for:1440954448468774922> - Admins can remove birthdays\n"
+            "• </birthdays:1440919374310408236> - Shows the full birthday list\n"
             "• Auto-updated public birthday list message\n"
             "• Birthday role is given on your day and removed afterward\n"
             "• New members get a welcome DM with a link to add their birthday"
@@ -247,7 +247,7 @@ async def info(ctx: discord.ApplicationContext):
         value=(
             "• </holiday_add:1442616885802832115> – Apply a holiday server theme\n"
             "  ┣ Matches special roles (Owner / Original Member / Member)\n"
-            "  ┗ Gives themed roles like **Grinch**, **Cranberry**, **Tinsel**, **Cauldron**, **Candy**, **Witchy**\n"
+            "  ┗ Gives themed roles like **Grinch**, **Cranberry**, **lights**, **Cauldron**, **Candy**, **Witchy**\n"
             "• </holiday_remove:1442616885802832116> – Remove the holiday server theme"
         ),
         inline=False,
@@ -458,7 +458,7 @@ async def media_add(ctx, category: discord.Option(str, choices=["movies", "shows
     await ctx.respond(f"Added **{title}** to {category}.", ephemeral=True)
 
 # ────────────────────── HOLIDAY COLOR ROLES (FINAL CORRECTED PAIRINGS) ──────────────────────
-CHRISTMAS_ROLES = {"Cranberry": "Owner", "Tinsel": "Original Member", "Grinch": "Member", "Christmas": "Bots"}
+CHRISTMAS_ROLES = {"Cranberry": "Owner", "lights": "Original Member", "Grinch": "Member", "Christmas": "Bots"}
 HALLOWEEN_ROLES = {"Cauldron": "Owner", "Candy": "Original Member", "Witchy": "Member", "Halloween": "Bots"}
 
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
