@@ -623,21 +623,6 @@ async def on_member_join(member):
 
 
 ############### COMMAND GROUPS ###############
-@bot.slash_command(name="info", description="Show all bot features")
-async def info(ctx: discord.ApplicationContext):
-    MEMBERS_ICON = "https://images-ext-1.discordapp.net/external/2i-PtcLgl_msR0VTT2mGn_5dtQiC9DK56PxR4uJfCLI/%3Fsize%3D1024/https/cdn.discordapp.com/avatars/1440914703894188122/ff746b98459152a0ba7c4eff5530cd9d.png?format=webp&quality=lossless&width=534&height=534"
-    embed = discord.Embed(title="Members - Bot Features", description="Here's everything I can do in this server!", color=0x00e1ff)
-    embed.add_field(name="Birthday System", value="• </set:1440919374310408234> - Members can set their birthday\n• </set_for:1440919374310408235> - Admins can set birthdays for others\n• </remove_for:1440954448468774922> - Admins can remove birthdays\n• </birthdays:1440919374310408236> - Shows the full birthday list\n• Auto-updated public birthday list message\n• Birthday role is given on your day and removed afterward\n• New members get a welcome DM with a link to add their birthday", inline=False)
-    embed.add_field(name="Movie & TV Night", value="• Maintains a server-wide library of movies and TV shows\n• </list:1442017846589653014> – Browse movies or shows (paged list)\n• </pick:1442305353030176800> – Add your movie pick to the pool\n• </pool:1442311836497350656> – See the current request pool\n• </random:1442017303230156963> – Randomly pick a movie from the pool and clear it\n• </media_add:1441698665981939825> – Admins can add new movies/shows to the library", inline=False)
-    embed.add_field(name="Holiday Themes", value="• </holiday_add:1442616885802832115> – Apply a holiday server theme\n ┣ Matches special roles (Admin / Original Member / Member)\n ┗ Gives themed roles like **Grinch**, **Cranberry**, **lights**, **Cauldron**, **Candy**, **Witchy**\n• </holiday_remove:1442616885802832116> – Remove the holiday server theme", inline=False)
-    embed.add_field(name="Dead Chat Role Color Cycle", value="• </color:1442666939842433125> – Changes the color of the **Dead Chat** role\n• Only people who already have the Dead Chat role can use it\n• Cycles through a set of bright colors for everyone with that role\n• Uses either the configured role ID or fallback name to find the role", inline=False)
-    embed.add_field(name="Member & Admin Utilities", value="• </say:1440927430209703986> – Admins can make the bot say a message in any channel\n• </commands:1442619988635549801> – Quick reference for admin-only commands", inline=False)
-    embed.add_field(name="Automatic Tasks", value="• Loads birthday data and media lists when the bot comes online\n• Checks birthdays every hour and updates the Birthday role automatically\n• Sends a birthday-list link DM to new members when they join", inline=False)
-    embed.add_field(name="Question of the Day", value="• Automatically posts a daily Question of the Day in the configured channel\n• Pulls questions from your Google Sheet (organized by seasons)\n• Tracks used questions and resets when all are used\n• </qotd_now:1444114293170765845> – Admins can post a QOTD immediately", inline=False)
-    embed.set_thumbnail(url=MEMBERS_ICON)
-    embed.set_footer(text="• Bot by Soft Dreamings", icon_url=MEMBERS_ICON)
-    await ctx.respond(embed=embed)
-
 @bot.slash_command(name="commands", description="Admin / Announcer commands")
 async def commands(ctx):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
