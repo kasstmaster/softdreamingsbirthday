@@ -469,7 +469,7 @@ async def info(ctx: discord.ApplicationContext):
             "• Automatically posts a daily Question of the Day in the configured channel\n"
             "• Pulls questions from your Google Sheet (organized by seasons)\n"
             "• Tracks used questions and resets when all are used\n"
-            "• </qotd_now:1440919374310408237> – Admins can post a QOTD immediately"
+            "• </qotd_now:1444114293170765845> – Admins can post a QOTD immediately"
         ),
         inline=False,
     )
