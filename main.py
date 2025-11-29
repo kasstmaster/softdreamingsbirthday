@@ -463,6 +463,17 @@ async def info(ctx: discord.ApplicationContext):
         inline=False,
     )
 
+    embed.add_field(
+        name="Question of the Day",
+        value=(
+            "• Automatically posts a daily Question of the Day in the configured channel\n"
+            "• Pulls questions from your Google Sheet (organized by seasons)\n"
+            "• Tracks used questions and resets when all are used\n"
+            "• </qotd_now:1440919374310408237> – Admins can post a QOTD immediately"
+        ),
+        inline=False,
+    )
+
     embed.set_thumbnail(url=MEMBERS_ICON)
     embed.set_footer(text="• Bot by Soft Dreamings", icon_url=MEMBERS_ICON)
 
