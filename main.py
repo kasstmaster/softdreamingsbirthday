@@ -525,8 +525,8 @@ class MediaPagerView(discord.ui.View):
         if not items:
             return "No items."
         max_page = self._max_page()
-        page_items, start = self._page_slice()
-        lines = [f"{i+1}. {t}" for i, t in enumerate(page_items, start+1)]
+        page_items, _ = self._page_slice()
+        lines = [f"{i}. {t}" for i, t in enumerate(page_items, 1)]
         header = f"{self.category.capitalize()} • Page {self.page+1}/{max_page+1} ({len(items)} total)"
         return f"{header}\n```text\n" + "\n".join(lines if lines else ["Empty"]) + "\n```"
 
@@ -535,7 +535,7 @@ class MediaPagerView(discord.ui.View):
         options = []
         for i, title in enumerate(page_items):
             index = start + i
-            label = f"{index+1}. {title}"
+            label = f"{i+1}. {title}"
             if len(label) > 100:
                 label = label[:97] + "..."
             options.append(discord.SelectOption(label=label, value=str(index)))
