@@ -306,25 +306,34 @@ async def post_daily_qotd():
         print("QOTD: Sheet has no data rows (only header or empty).")
         return
 
-    questions = all_vals[1:]  # skip header row
+    questions = all_vals[1:]  # skip header row  ←←←← MOVE THIS LINE HERE
 
-    # 'unused' = rows where col B is empty or missing
-    unused = [row for row in questions if len(row) < 2 or not (row[1] or "").strip()]
+    # Find all unused questions — works whether Status is in column A or B
+    unused = []
+    for row in questions:
+        # Pad short rows so we can safely index
+        row += [""] * (2 - len(row))
+        status_a = row[0].strip()
+        status_b = row[1].strip() if len(row) > 1 else ""
+        question_text = row[1].strip() if len(row) > 1 else row[0].strip()
+
+        # A row is unused if its status column (A or B) is empty
+        if question_text and (not status_a or not status_b):
+            unused.append(row)
 
     if not unused:
-        # Reset all B cells and treat all as unused
-        print("QOTD: All questions marked used; resetting column B.")
-        worksheet.update("B2:B", [[""] for _ in range(len(questions))])
+        print("QOTD: All questions marked used; resetting status columns.")
+        # Clear both A and B just to be safe
+        worksheet.update("A2:B", [[""] * 2 for _ in range(len(questions))])
         unused = questions
 
-    # Choose a random unused row
     chosen = pyrandom.choice(unused)
-    # Ensure at least column A exists
-    if not chosen or not (chosen[0] or "").strip():
+    # Pad again for safety
+    chosen += [""] * (2 - len(chosen))
+    question = chosen[1].strip() if chosen[1].strip() else chosen[0].strip()
+    if not question:
         print("QOTD: Chosen row has no question text; skipping.")
         return
-
-    question = chosen[0].strip()
 
     # Seasonal styling (only color changes by season)
     colors = {"Regular": 0x9b59b6, "Fall Season": 0xe67e22, "Christmas": 0x00ff00}
@@ -340,8 +349,10 @@ async def post_daily_qotd():
 
     # Mark as used
     row_idx = questions.index(chosen) + 2  # +2 because of header & 1-based rows
+    # Mark as used in the correct status column (A if question was in B, B if question was in A)
+    status_col = "A" if chosen[1].strip() else "B"
     worksheet.update(
-        f"B{row_idx}",
+        f"{status_col}{row_idx}",
         [[f"Used {datetime.utcnow().strftime('%Y-%m-%d')}"]],
     )
     print(f"QOTD: Posted question from row {row_idx} ({season}).")
