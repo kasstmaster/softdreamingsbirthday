@@ -326,17 +326,12 @@ async def post_daily_qotd():
 
     question = chosen[0].strip()
 
-    # Seasonal styling
+    # Seasonal styling (only color changes by season)
     colors = {"Regular": 0x9b59b6, "Fall Season": 0xe67e22, "Christmas": 0x00ff00}
-    emojis = {
-        "Regular": "Question of the Day",
-        "Fall Season": "Fall Question",
-        "Christmas": "Christmas Question",
-    }
 
     embed = discord.Embed(
-        title=f"{emojis.get(season, 'Question of the Day')} Question of the Day",
-        description=f"**{question}**",
+        title="Question of the Day",
+        description=question,  # no bold
         color=colors.get(season, 0x9b59b6),
     )
     embed.set_footer(text=f"{season} • Reply below!")
