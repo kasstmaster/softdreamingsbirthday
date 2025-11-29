@@ -804,6 +804,45 @@ async def birthday_role_sync(ctx):
                 pass
     await ctx.respond(f"Synced birthday member role to {count} member(s).", ephemeral=True)
 
+@bot.slash_command(name="pool_remove", description="Admin: Remove a pick from today's movie pool")
+async def pool_remove(
+    ctx,
+    user: discord.Option(discord.Member, "User whose pick to remove", required=False),
+    title: discord.Option(str, "Exact title to remove (case-insensitive)", required=False, autocomplete=movie_autocomplete),
+):
+    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+        return await ctx.respond("Admin only.", ephemeral=True)
+    pool = request_pool.get(ctx.guild.id, [])
+    if not pool:
+        return await ctx.respond("Pool is empty.", ephemeral=True)
+    if not user and not title:
+        return await ctx.respond("Specify either a user or a title.", ephemeral=True)
+    removed = []
+    new_pool = []
+    target_title = title.strip().lower() if title else None
+    target_uid = user.id if user else None
+    for uid, t in pool:
+        keep = True
+        if target_uid and uid == target_uid:
+            if not target_title or t.lower() == target_title:
+                member = ctx.guild.get_member(uid)
+                mention = member.mention if member else f"<@{uid}>"
+                removed.append(f"{mention} — **{t}**")
+                keep = False
+        elif target_title and t.lower() == target_title:
+            member = ctx.guild.get_member(uid)
+            mention = member.mention if member else f"<@{uid}>"
+            removed.append(f"{mention} — **{t}**")
+            keep = False
+        if keep:
+            new_pool.append((uid, t))
+    if not removed:
+        return await ctx.respond("No matching pick found.", ephemeral=True)
+    request_pool[ctx.guild.id] = new_pool
+    await save_request_pool()
+    await update_pool_public_message(ctx.guild)
+    await ctx.respond(f"Removed:\n" + "\n".join(removed), ephemeral=True)
+
 @bot.slash_command(name="search", description="Search the movie list and add your pick")
 async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete)):
     if not movie_titles:
