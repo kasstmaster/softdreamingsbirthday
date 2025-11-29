@@ -870,10 +870,14 @@ async def random_pick(ctx):
 @bot.slash_command(name="pick", description="Browse the movie collection and add picks to today's pool")
 async def pick_browser(
     ctx,
-    category: discord.Option(str, choices=["movies", "shows"] if ENABLE_TV_IN_PICK else ["movies"], default="movies", required=False)
+    category: discord.Option(str, choices=["movies", "shows"], default="movies", required=False) = "movies" if ENABLE_TV_IN_PICK else None
 ):
-    if category == "shows" and not ENABLE_TV_IN_PICK:
-        return await ctx.respond("TV shows are currently disabled in /pick.", ephemeral=True)
+    if not ENABLE_TV_IN_PICK:
+        category = "movies"
+    elif category == "shows":
+        pass
+    else:
+        category = "movies"
     items = movie_titles if category == "movies" else tv_titles
     if not items:
         return await ctx.respond(f"No {category} loaded.", ephemeral=True)
