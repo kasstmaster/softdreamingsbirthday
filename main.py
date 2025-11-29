@@ -802,22 +802,27 @@ async def birthday_role_sync(ctx):
                 pass
     await ctx.respond(f"Synced birthday member role to {count} member(s).", ephemeral=True)
 
-@bot.slash_command(name="pick", description="Pick a movie to add to the pool")
+@bot.slash_command(name="search", description="Search the movie list and add your pick")
 async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete)):
     if not movie_titles:
         return await ctx.respond("Movie list not loaded.", ephemeral=True)
     canon = next((t for t in movie_titles if t.lower() == title.strip().lower()), None)
     if not canon:
         return await ctx.respond("That movie isn't in the library.", ephemeral=True)
-
     pool = request_pool.setdefault(ctx.guild.id, [])
     user_indices = [i for i, (uid, _) in enumerate(pool) if uid == ctx.author.id]
-
     if len(user_indices) >= MAX_POOL_ENTRIES_PER_USER:
         return await ctx.respond(
-            f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/pick_replace` to swap one of your picks.",
+            f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/replace` to swap one of your picks.",
             ephemeral=True,
         )
+    pool.append((ctx.author.id, canon))
+    await save_request_pool()
+    await update_pool_public_message(ctx.guild)
+    return await ctx.respond(
+        f"Added **{canon}** • You now have `{len(user_indices) + 1}` pick(s) in the pool.",
+        ephemeral=True,
+    )
 
     pool.append((ctx.author.id, canon))
     await save_request_pool()
@@ -827,7 +832,7 @@ async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete))
         ephemeral=True,
     )
 
-@bot.slash_command(name="pick_replace", description="Replace one of your picks in the pool")
+@bot.slash_command(name="replace", description="Replace one of your existing picks in the pool")
 async def pick_replace(
     ctx,
     old_title: discord.Option(str, autocomplete=my_pool_movie_autocomplete),
@@ -838,15 +843,12 @@ async def pick_replace(
     canon_new = next((t for t in movie_titles if t.lower() == new_title.strip().lower()), None)
     if not canon_new:
         return await ctx.respond("That movie isn't in the library.", ephemeral=True)
-
     pool = request_pool.get(ctx.guild.id, [])
     if not pool:
         return await ctx.respond("Pool is empty.", ephemeral=True)
-
     indices = [i for i, (uid, title) in enumerate(pool) if uid == ctx.author.id and title == old_title]
     if not indices:
         return await ctx.respond("That pick is not in the pool as yours.", ephemeral=True)
-
     idx = indices[0]
     pool[idx] = (ctx.author.id, canon_new)
     request_pool[ctx.guild.id] = pool
@@ -871,7 +873,7 @@ async def random_pick(ctx):
     member = ctx.guild.get_member(user_id)
     await ctx.respond(f"Random Pick: **{title}**\nRequested by {member.mention if member else '<@'+str(user_id)+'>'}")
 
-@bot.slash_command(name="list", description="View the list of movies & shows")
+@bot.slash_command(name="pick", description="Browse the movie/TV list and add a pick from pages")
 async def list_media(ctx, category: discord.Option(str, choices=["movies", "shows"])):
     items = movie_titles if category == "movies" else tv_titles
     if not items:
