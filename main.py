@@ -360,15 +360,25 @@ async def post_daily_qotd():
 
 async def qotd_scheduler():
     await bot.wait_until_ready()
+
+    TARGET_HOUR_UTC = 17   # 8:00 AM Alaska (AKST = UTC-9 -> 17:00 UTC)
+    TARGET_MINUTE = 0
+
     while not bot.is_closed():
         now = datetime.utcnow()
-        if now.hour == QOTD_TIME_HOUR and now.minute < 5:
+
+        if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             try:
                 await post_daily_qotd()
             except Exception as e:
                 print("QOTD scheduler error:", repr(e))
                 traceback.print_exc()
-        await asyncio.sleep(300)
+
+            # Prevent multiple posts in same minute
+            await asyncio.sleep(61)
+
+        # Cheap check twice a minute
+        await asyncio.sleep(30)
 
 
 # Instant test command (admin only)
@@ -396,20 +406,37 @@ async def qotd_now(ctx):
 
 async def holiday_scheduler():
     await bot.wait_until_ready()
+
+    TARGET_HOUR_UTC = 9    # 12:00 AM Alaska (AKST = UTC-9)
+    TARGET_MINUTE = 0
+
     while not bot.is_closed():
-        today = datetime.utcnow().strftime("%m-%d")
+        now = datetime.utcnow()
 
-        for guild in bot.guilds:
-            if "10-01" <= today <= "10-31":
-                await apply_holiday_theme(guild, "halloween")
-            elif "12-01" <= today <= "12-26":
-                await apply_holiday_theme(guild, "christmas")
-            else:
-                await clear_holiday_theme(guild)
+        # Trigger exactly at the target time
+        if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
+            today = now.strftime("%m-%d")
 
-        # Run once per day
-        await asyncio.sleep(86400)
+            for guild in bot.guilds:
 
+                if "10-01" <= today <= "10-31":
+                    # Halloween window
+                    await clear_holiday_theme(guild)
+                    await apply_holiday_theme(guild, "halloween")
+
+                elif "12-01" <= today <= "12-26":
+                    # Christmas window
+                    await clear_holiday_theme(guild)
+                    await apply_holiday_theme(guild, "christmas")
+
+                # Outside windows:
+                # Do NOTHING — manual themes stay until the next holiday
+
+            # Prevent double running in the same minute
+            await asyncio.sleep(61)
+
+        # Check every 30 seconds (very cheap)
+        await asyncio.sleep(30)
 
 # ────────────────────── COMMANDS ──────────────────────
 @bot.slash_command(name="info", description="Show all bot features")
@@ -891,20 +918,39 @@ async def on_member_join(member):
 
 async def birthday_checker():
     await bot.wait_until_ready()
+
+    TARGET_HOUR_UTC = 15   # 6:00 AM Alaska (AKST = UTC-9 -> 15:00 UTC)
+    TARGET_MINUTE = 0
+
     while not bot.is_closed():
-        today = datetime.utcnow().strftime("%m-%d")
-        data = await _load_storage_message()
-        for guild in bot.guilds:
-            role = guild.get_role(BIRTHDAY_ROLE_ID)
-            if not role:
-                continue
-            bdays = data.get(str(guild.id), {})
-            for member in guild.members:
-                if bdays.get(str(member.id)) == today:
-                    if role not in member.roles:
-                        await member.add_roles(role, reason="Birthday!")
-                elif role in member.roles:
-                    await member.remove_roles(role, reason="Birthday over")
-        await asyncio.sleep(3600)
+        now = datetime.utcnow()
+
+        if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
+            today = now.strftime("%m-%d")
+            data = await _load_storage_message()
+
+            for guild in bot.guilds:
+                role = guild.get_role(BIRTHDAY_ROLE_ID)
+                if not role:
+                    continue
+
+                bdays = data.get(str(guild.id), {})
+
+                for member in guild.members:
+                    if bdays.get(str(member.id)) == today:
+                        # Give birthday role
+                        if role not in member.roles:
+                            await member.add_roles(role, reason="Birthday!")
+                    else:
+                        # Remove role if their birthday is not today
+                        if role in member.roles:
+                            await member.remove_roles(role, reason="Birthday over")
+
+            # Avoid double-run in same minute
+            await asyncio.sleep(61)
+
+        # Light check loop
+        await asyncio.sleep(30)
+
 
 bot.run(os.getenv("TOKEN"))
