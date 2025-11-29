@@ -94,6 +94,7 @@ PAGE_SIZE = 25
 
 ############### GLOBAL STATE / STORAGE ###############
 storage_message_id: int | None = None
+pool_storage_message_id: int | None = None
 movie_titles: list[str] = []
 tv_titles: list[str] = []
 request_pool: dict[int, list[tuple[int, str]]] = {}
@@ -107,16 +108,28 @@ def build_mm_dd(month_name: str, day: int) -> str | None:
     return f"{month_num}-{day:02d}"
 
 async def initialize_storage_message():
-    global storage_message_id
+    global storage_message_id, pool_storage_message_id
     channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
     if not channel:
         return
-    async for msg in channel.history(limit=50):
-        if msg.author == bot.user:
-            storage_message_id = msg.id
-            return
-    msg = await channel.send("{}")
-    storage_message_id = msg.id
+    birthday_msg = None
+    pool_msg = None
+    async for msg in channel.history(limit=50, oldest_first=True):
+        if msg.author != bot.user:
+            continue
+        content = (msg.content or "").strip()
+        if content.startswith("POOL_DATA:"):
+            pool_msg = msg
+        else:
+            birthday_msg = msg
+        if birthday_msg and pool_msg:
+            break
+    if birthday_msg is None:
+        birthday_msg = await channel.send("{}")
+    if pool_msg is None:
+        pool_msg = await channel.send("POOL_DATA: {}")
+    storage_message_id = birthday_msg.id
+    pool_storage_message_id = pool_msg.id
 
 async def _load_storage_message() -> dict:
     global storage_message_id
@@ -143,6 +156,63 @@ async def _save_storage_message(data: dict):
         await msg.edit(content=text)
     except:
         pass
+
+async def _load_pool_message() -> dict:
+    global pool_storage_message_id
+    channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
+    if not channel or pool_storage_message_id is None:
+        return {}
+    try:
+        msg = await channel.fetch_message(pool_storage_message_id)
+        content = (msg.content or "").strip()
+        if content.startswith("POOL_DATA:"):
+            content = content[len("POOL_DATA:"):].strip()
+        data = json.loads(content or "{}")
+        return data if isinstance(data, dict) else {}
+    except:
+        return {}
+
+async def _save_pool_message(data: dict):
+    global pool_storage_message_id
+    channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
+    if not channel or pool_storage_message_id is None:
+        return
+    try:
+        msg = await channel.fetch_message(pool_storage_message_id)
+        text = "POOL_DATA: " + json.dumps(data, separators=(",", ":"))
+        if len(text) > 1900:
+            text = text[:1900]
+        await msg.edit(content=text)
+    except:
+        pass
+
+async def load_request_pool():
+    global request_pool
+    raw = await _load_pool_message()
+    request_pool = {}
+    for gid_str, entries in raw.items():
+        try:
+            gid = int(gid_str)
+        except:
+            continue
+        pool_list = []
+        if isinstance(entries, list):
+            for item in entries:
+                if isinstance(item, list) and len(item) == 2:
+                    uid, title = item
+                    try:
+                        uid_int = int(uid)
+                    except:
+                        continue
+                    pool_list.append((uid_int, str(title)))
+        if pool_list:
+            request_pool[gid] = pool_list
+
+async def save_request_pool():
+    raw = {}
+    for gid, pool in request_pool.items():
+        raw[str(gid)] = [[uid, title] for (uid, title) in pool]
+    await _save_pool_message(raw)
 
 async def _load_titles_from_channel(channel_id: int) -> list[str]:
     ch = bot.get_channel(channel_id)
@@ -418,6 +488,7 @@ async def on_ready():
     print(f"{bot.user} online!")
     await initialize_storage_message()
     await initialize_media_lists()
+    await load_request_pool()
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
     bot.loop.create_task(holiday_scheduler())
@@ -504,6 +575,7 @@ async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete))
         return await ctx.respond("That movie isn't in the library.", ephemeral=True)
     pool = request_pool.setdefault(ctx.guild.id, [])
     pool.append((ctx.author.id, canon))
+    await save_request_pool()
     await ctx.respond(f"Added **{canon}** • Pool size: `{len(pool)}`", ephemeral=True)
 
 @bot.slash_command(name="pool", description="See what movies have been added to todays pool")
@@ -521,6 +593,7 @@ async def random_pick(ctx):
         return await ctx.respond("Pool is empty.", ephemeral=True)
     user_id, title = pyrandom.choice(pool)
     request_pool[ctx.guild.id] = []
+    await save_request_pool()
     member = ctx.guild.get_member(user_id)
     await ctx.respond(f"Random Pick: **{title}**\nRequested by {member.mention if member else '<@'+str(user_id)+'>'}")
 
