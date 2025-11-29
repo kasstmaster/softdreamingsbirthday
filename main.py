@@ -380,9 +380,10 @@ async def qotd_now(ctx):
         traceback.print_exc()
         # Tell you what went wrong
         return await ctx.followup.send(
-            f"QOTD error: `{e}`\nCheck Railway logs for details.",
-            ephemeral=True,
-        )
+        f"QOTD error type: `{type(e).__name__}`\n"
+        f"Message: `{repr(e)}`",
+        ephemeral=True,
+    )
 
     await ctx.followup.send("QOTD posted!", ephemeral=True)
 
