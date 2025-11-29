@@ -576,7 +576,7 @@ class MediaPagerView(discord.ui.View):
         user_indices = [i for i, (uid, _) in enumerate(pool) if uid == user.id]
         if len(user_indices) >= MAX_POOL_ENTRIES_PER_USER:
             return await interaction.response.send_message(
-                f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/pick_replace` to swap one of your picks.",
+                f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use </replace:1444418642103107676> to swap one of your picks.",
                 ephemeral=True,
             )
         pool.append((user.id, canon))
