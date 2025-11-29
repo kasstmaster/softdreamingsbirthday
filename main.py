@@ -354,13 +354,17 @@ async def update_birthday_list_message(guild: discord.Guild):
 async def build_pool_embed(guild: discord.Guild) -> discord.Embed:
     pool = request_pool.get(guild.id, [])
     if not pool:
-        return discord.Embed(title="MoviePool", description="Pool is empty.", color=0x2e2f33)
+        return discord.Embed(title="Todays Movie Pool", description="Pool is empty.", color=0x2e2f33)
+    sorted_pool = sorted(
+        pool,
+        key=lambda entry: guild.get_member(entry[0]).display_name.lower() if guild.get_member(entry[0]) else ""
+    )
     lines = []
-    for user_id, title in pool:
+    for user_id, title in sorted_pool:
         member = guild.get_member(user_id)
-        mention = member.mention if member else "<@"+str(user_id)+">"
+        mention = member.mention if member else f"<@{user_id}>"
         lines.append(f"• {mention} — **{title}**")
-    return discord.Embed(title="Movie Pool", description="\n".join(lines), color=0x2e2f33)
+    return discord.Embed(title="Todays Movie Pool", description="\n".join(lines), color=0x2e2f33)
 
 async def update_pool_public_message(guild: discord.Guild):
     loc = pool_message_locations.get(guild.id)
