@@ -60,6 +60,7 @@ if GOOGLE_CREDS_RAW and SHEET_ID:
 else:
     print("QOTD disabled: missing GOOGLE_CREDENTIALS or GOOGLE_SHEET_ID")
 
+ENABLE_TV_IN_PICK = False
 BIRTHDAY_ROLE_ID = _env_int("BIRTHDAY_ROLE_ID", 1217937235840598026)
 BIRTHDAY_STORAGE_CHANNEL_ID = _env_int("BIRTHDAY_STORAGE_CHANNEL_ID", 1440912334813134868)
 BIRTHDAY_LIST_CHANNEL_ID = 1440989357535395911
@@ -527,7 +528,8 @@ class MediaPagerView(discord.ui.View):
         max_page = self._max_page()
         page_items, _ = self._page_slice()
         lines = [f"{i}. {t}" for i, t in enumerate(page_items, 1)]
-        header = f"{self.category.capitalize()} • Page {self.page+1}/{max_page+1} ({len(items)} total)"
+        display_cat = "TV Shows" if self.category == "shows" else "Movies"
+        header = f"{display_cat} • Page {self.page+1}/{max_page+1} ({len(items)} total)"
         return f"{header}\n```text\n" + "\n".join(lines if lines else ["Empty"]) + "\n```"
 
     def _refresh_dropdown(self):
@@ -824,14 +826,6 @@ async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete))
         ephemeral=True,
     )
 
-    pool.append((ctx.author.id, canon))
-    await save_request_pool()
-    await update_pool_public_message(ctx.guild)
-    return await ctx.respond(
-        f"Added **{canon}** • You now have `{len(user_indices) + 1}` pick(s) in the pool.",
-        ephemeral=True,
-    )
-
 @bot.slash_command(name="replace", description="Replace one of your existing picks in the pool")
 async def pick_replace(
     ctx,
@@ -873,8 +867,13 @@ async def random_pick(ctx):
     member = ctx.guild.get_member(user_id)
     await ctx.respond(f"Random Pick: **{title}**\nRequested by {member.mention if member else '<@'+str(user_id)+'>'}")
 
-@bot.slash_command(name="pick", description="Browse the movie/TV list and add a pick from pages")
-async def list_media(ctx, category: discord.Option(str, choices=["movies", "shows"])):
+@bot.slash_command(name="pick", description="Browse the movie collection and add picks to today's pool")
+async def pick_browser(
+    ctx,
+    category: discord.Option(str, choices=["movies", "shows"] if ENABLE_TV_IN_PICK else ["movies"], default="movies", required=False)
+):
+    if category == "shows" and not ENABLE_TV_IN_PICK:
+        return await ctx.respond("TV shows are currently disabled in /pick.", ephemeral=True)
     items = movie_titles if category == "movies" else tv_titles
     if not items:
         return await ctx.respond(f"No {category} loaded.", ephemeral=True)
