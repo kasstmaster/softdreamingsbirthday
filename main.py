@@ -30,7 +30,6 @@ BIRTHDAY_ROLE_ID = _env_int("BIRTHDAY_ROLE_ID", 1217937235840598026)
 BIRTHDAY_STORAGE_CHANNEL_ID = _env_int("BIRTHDAY_STORAGE_CHANNEL_ID", 1440912334813134868)
 BIRTHDAY_LIST_CHANNEL_ID = 1440989357535395911
 BIRTHDAY_LIST_MESSAGE_ID = 1440989655515271248
-MOVIE_REQUESTS_CHANNEL_ID = _env_int("MOVIE_REQUESTS_CHANNEL_ID", 0)
 MOVIE_STORAGE_CHANNEL_ID = _env_int("MOVIE_STORAGE_CHANNEL_ID", 0)
 TV_STORAGE_CHANNEL_ID = _env_int("TV_STORAGE_CHANNEL_ID", 0)
 DEAD_CHAT_ROLE_ID = _env_int("DEAD_CHAT_ROLE_ID", 0)
@@ -408,7 +407,7 @@ async def info(ctx: discord.ApplicationContext):
     embed.add_field(name="Movie & TV Night", value="• Maintains a server-wide library of movies and TV shows\n• </list:1442017846589653014> – Browse movies or shows (paged list)\n• </pick:1442305353030176800> – Add your movie pick to the pool\n• </pool:1442311836497350656> – See the current request pool\n• </random:1442017303230156963> – Randomly pick a movie from the pool and clear it\n• </media_add:1441698665981939825> – Admins can add new movies/shows to the library", inline=False)
     embed.add_field(name="Holiday Themes", value="• </holiday_add:1442616885802832115> – Apply a holiday server theme\n ┣ Matches special roles (Admin / Original Member / Member)\n ┗ Gives themed roles like **Grinch**, **Cranberry**, **lights**, **Cauldron**, **Candy**, **Witchy**\n• </holiday_remove:1442616885802832116> – Remove the holiday server theme", inline=False)
     embed.add_field(name="Dead Chat Role Color Cycle", value="• </color:1442666939842433125> – Changes the color of the **Dead Chat** role\n• Only people who already have the Dead Chat role can use it\n• Cycles through a set of bright colors for everyone with that role\n• Uses either the configured role ID or fallback name to find the role", inline=False)
-    embed.add_field(name="Member & Admin Utilities", value="• </say:1440927430209703986> – Admins can make the bot say a message in any channel\n• </commands:1442619988635549801> – Quick reference for admin-only commands\n• </membercommands:1442622321243459598> – Shows everything regular members can use", inline=False)
+    embed.add_field(name="Member & Admin Utilities", value="• </say:1440927430209703986> – Admins can make the bot say a message in any channel\n• </commands:1442619988635549801> – Quick reference for admin-only commands", inline=False)
     embed.add_field(name="Automatic Tasks", value="• Loads birthday data and media lists when the bot comes online\n• Checks birthdays every hour and updates the Birthday role automatically\n• Sends a birthday-list link DM to new members when they join", inline=False)
     embed.add_field(name="Question of the Day", value="• Automatically posts a daily Question of the Day in the configured channel\n• Pulls questions from your Google Sheet (organized by seasons)\n• Tracks used questions and resets when all are used\n• </qotd_now:1444114293170765845> – Admins can post a QOTD immediately", inline=False)
     embed.set_thumbnail(url=MEMBERS_ICON)
@@ -424,15 +423,6 @@ async def commands(ctx):
     embed.add_field(name="Movie Night", value="• </random:1442017303230156963> – Force pick", inline=False)
     embed.add_field(name="Holidays", value="• </holiday_add:1442616885802832115>\n• </holiday_remove:1442616885802832116>", inline=False)
     embed.set_footer(text="Also: /say • /media_add")
-    await ctx.respond(embed=embed, ephemeral=True)
-
-@bot.slash_command(name="membercommands", description="What regular members can use")
-async def membercommands(ctx):
-    embed = discord.Embed(title="Member Commands", color=0x00e1ff)
-    embed.add_field(name="Birthdays", value="• </set:1440919374310408234>\n• </birthdays:1440919374310408236>", inline=False)
-    embed.add_field(name="Movie Night", value="• </list:1442017846589653014> movies/shows\n• </pick:1442305353030176800>\n• </pool:1442311836497350656>", inline=False)
-    embed.add_field(name="Fun", value="• </color:1442666939842433125> (if you have Dead Chat)", inline=False)
-    embed.add_field(name="Full list?", value="Use **/info**!", inline=False)
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="set", description="Share your birthday with the server")
