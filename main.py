@@ -894,18 +894,25 @@ async def pool(ctx):
     embed = await build_pool_embed(ctx.guild)
     await ctx.respond(embed=embed, ephemeral=True)
 
-@bot.slash_command(name="random", description="The bot will choose a random movie from the pool")
+@bot.slash_command(name="random", description="Pick tonight's winner — unpicked movies roll over to tomorrow!")
 async def random_pick(ctx):
     pool = request_pool.get(ctx.guild.id, [])
     if not pool:
         return await ctx.respond("Pool is empty.", ephemeral=True)
-    user_id, title = pyrandom.choice(pool)
-    request_pool[ctx.guild.id] = []
+    winner_idx = pyrandom.randrange(len(pool))
+    winner_id, winner_title = pool[winner_idx]
+    remaining_pool = [entry for i, entry in enumerate(pool) if i != winner_idx]
+    request_pool[ctx.guild.id] = remaining_pool
     await save_request_pool()
     await update_pool_public_message(ctx.guild)
-    member = ctx.guild.get_member(user_id)
-    await ctx.respond(f"🎬 Pool Winner: {title}\n**{member.mention if member else '<@'+str(user_id)+'>'}'s pick!**")
-
+    member = ctx.guild.get_member(winner_id)
+    mention = member.mention if member else f"<@{winner_id}>"
+    rollover_count = len(remaining_pool)
+    rollover_text = f"\n\n{rollover_count} movie{'' if rollover_count == 1 else 's'} rolled over to tomorrow's pool" if rollover_count else ""
+    await ctx.respond(
+        f"Pool Winner: **{winner_title}**\n"
+        f"**{mention}'s pick!**{rollover_text}"
+    )
 if ENABLE_TV_IN_PICK:
     @bot.slash_command(name="pick", description="Browse the movie or TV collection and add picks to today's pool")
     async def pick_browser(ctx, category: discord.Option(str, choices=["movies", "shows"], default="movies")):
