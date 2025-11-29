@@ -484,41 +484,113 @@ async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
 
 
 ############### VIEWS / UI COMPONENTS ###############
+############### VIEWS / UI COMPONENTS ###############
 class MediaPagerView(discord.ui.View):
     def __init__(self, category: str, page: int = 0):
         super().__init__(timeout=120)
         self.category = category
         self.page = page
+        self.dropdown = discord.ui.Select(
+            placeholder="Add one of these to the pool!",
+            min_values=1,
+            max_values=1,
+            options=[]
+        )
+        self.dropdown.callback = self.on_select
+        self.add_item(self.dropdown)
 
     def _items(self):
         return movie_titles if self.category == "movies" else tv_titles
 
     def _max_page(self):
-        return max(0, (len(self._items()) - 1) // PAGE_SIZE)
+        items = self._items()
+        if not items:
+            return 0
+        return max(0, (len(items) - 1) // PAGE_SIZE)
+
+    def _page_slice(self):
+        items = self._items()
+        max_page = self._max_page()
+        self.page = max(0, min(self.page, max_page))
+        start = self.page * PAGE_SIZE
+        end = start + PAGE_SIZE
+        return items[start:end], start
 
     def _build_content(self):
         items = self._items()
         if not items:
             return "No items."
         max_page = self._max_page()
-        self.page = max(0, min(self.page, max_page))
-        start = self.page * PAGE_SIZE
-        slice_items = items[start:start + PAGE_SIZE]
-        lines = [f"{i+1}. {t}" for i, t in enumerate(slice_items, start+1)]
+        page_items, start = self._page_slice()
+        lines = [f"{i+1}. {t}" for i, t in enumerate(page_items, start+1)]
         header = f"{self.category.capitalize()} • Page {self.page+1}/{max_page+1} ({len(items)} total)"
         return f"{header}\n```text\n" + "\n".join(lines if lines else ["Empty"]) + "\n```"
 
+    def _refresh_dropdown(self):
+        page_items, start = self._page_slice()
+        options = []
+        for i, title in enumerate(page_items):
+            index = start + i
+            label = f"{index+1}. {title}"
+            if len(label) > 100:
+                label = label[:97] + "..."
+            options.append(discord.SelectOption(label=label, value=str(index)))
+        if not options:
+            options.append(discord.SelectOption(label="No items on this page", value="none", default=True))
+        self.dropdown.options = options
+
     async def send_initial(self, ctx):
+        self._refresh_dropdown()
         await ctx.respond(self._build_content(), view=self, ephemeral=True)
+
+    async def on_select(self, interaction: discord.Interaction):
+        if not self.dropdown.values:
+            return await interaction.response.send_message("No selection.", ephemeral=True)
+        value = self.dropdown.values[0]
+        if value == "none":
+            return await interaction.response.send_message("Nothing to add from this page.", ephemeral=True)
+        try:
+            index = int(value)
+        except ValueError:
+            return await interaction.response.send_message("Invalid selection.", ephemeral=True)
+        items = self._items()
+        if index < 0 or index >= len(items):
+            return await interaction.response.send_message("That item no longer exists.", ephemeral=True)
+        title = items[index]
+        if self.category != "movies":
+            return await interaction.response.send_message("Only movies can be added to the pool.", ephemeral=True)
+        canon = next((t for t in movie_titles if t.lower() == title.strip().lower()), None)
+        if not canon:
+            return await interaction.response.send_message("That movie is no longer in the library.", ephemeral=True)
+        guild = interaction.guild
+        user = interaction.user
+        if guild is None:
+            return await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
+        pool = request_pool.setdefault(guild.id, [])
+        user_indices = [i for i, (uid, _) in enumerate(pool) if uid == user.id]
+        if len(user_indices) >= MAX_POOL_ENTRIES_PER_USER:
+            return await interaction.response.send_message(
+                f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/pick_replace` to swap one of your picks.",
+                ephemeral=True,
+            )
+        pool.append((user.id, canon))
+        await save_request_pool()
+        await update_pool_public_message(guild)
+        await interaction.response.send_message(
+            f"Added **{canon}** • You now have `{len(user_indices) + 1}` pick(s) in the pool.",
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
     async def prev(self, button, interaction):
         self.page -= 1
+        self._refresh_dropdown()
         await interaction.response.edit_message(content=self._build_content(), view=self)
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
     async def next(self, button, interaction):
         self.page += 1
+        self._refresh_dropdown()
         await interaction.response.edit_message(content=self._build_content(), view=self)
 
 
