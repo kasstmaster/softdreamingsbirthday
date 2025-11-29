@@ -353,18 +353,23 @@ async def update_birthday_list_message(guild: discord.Guild):
 
 async def build_pool_embed(guild: discord.Guild) -> discord.Embed:
     pool = request_pool.get(guild.id, [])
-    if not pool:
-        return discord.Embed(title="Todays Movie Pool", description="Pool is empty.", color=0x2e2f33)
     sorted_pool = sorted(
         pool,
-        key=lambda entry: guild.get_member(entry[0]).display_name.lower() if guild.get_member(entry[0]) else ""
+        key=lambda e: (guild.get_member(e[0]) or discord.Object(e[0])).display_name.lower()
     )
-    lines = []
-    for user_id, title in sorted_pool:
-        member = guild.get_member(user_id)
-        mention = member.mention if member else f"<@{user_id}>"
-        lines.append(f"• {mention} — **{title}**")
-    return discord.Embed(title="Todays Movie Pool", description="\n".join(lines), color=0x2e2f33)
+    lines = [
+        f"{guild.get_member(u) and guild.get_member(u).mention or f'<@{u}>'} — **{t}**"
+        for u, t in sorted_pool
+    ]
+    description = "\n".join(lines) if lines else "Pool is empty — be the first to add a movie!"
+    description += "\n\n**ADD TO THE POOL**\n"
+    description += "• </pick:1442305353030176800> - Browse and pick from the dropdown menu.\n"
+    description += "• </search:1444418642103107675> - Search if you already know what to pick."
+    return discord.Embed(
+        title=movie_night_time(),
+        description=description,
+        color=0x2e2f33
+    )
 
 async def update_pool_public_message(guild: discord.Guild):
     loc = pool_message_locations.get(guild.id)
@@ -486,6 +491,16 @@ async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
         await guild.edit(icon=data)
     except:
         pass
+
+from datetime import datetime, time, timezone
+
+def movie_night_time() -> str:
+    """Returns 'MOVIE NIGHTS START AT <t:XXXXX:t>' with correct time (6 PM UTC)"""
+    now = datetime.now(timezone.utc)
+    tonight = datetime.combine(now.date(), time(18, 0), tzinfo=timezone.utc)
+    if now >= tonight:
+        tonight = tonight.replace(day=tonight.day + 1)  # tomorrow
+    return f"MOVIE NIGHTS START AT <t:{int(tonight.timestamp())}:t>"
 
 
 ############### VIEWS / UI COMPONENTS ###############
