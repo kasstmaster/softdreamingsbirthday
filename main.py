@@ -368,6 +368,7 @@ async def build_pool_embed(guild: discord.Guild) -> discord.Embed:
     description += "\n\n**ADD UP TO 3 MOVIES TO THE POOL**\n"
     description += "• </pick:1442305353030176800> - Browse and pick from the dropdown menu\n"
     description += "• </search:1444418642103107675> - If you already know what to pick"
+    description += "• </replace:1444418642103107676> - Replace one of your picks in the pool"
     return discord.Embed(
         title=movie_night_time(),
         description=description,
