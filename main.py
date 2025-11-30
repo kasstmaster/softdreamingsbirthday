@@ -960,7 +960,7 @@ async def random_pick(ctx):
     announcement = (
         f"Pool Winner: **{winner_title}**\n"
         f"{mention}'s pick!\n\n"
-        f"**Rate the movie:**"
+        f"**Rate the movie**"
     )
     channel = ctx.guild.get_channel(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID)
     if not channel:
