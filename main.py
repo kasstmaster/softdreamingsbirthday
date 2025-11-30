@@ -931,8 +931,8 @@ async def random_pick(ctx):
     rollover_count = len(remaining_pool)
     rollover_text = f"\n\n{rollover_count} movie{'' if rollover_count == 1 else 's'} rolled over to the next pool" if rollover_count else ""
     await ctx.respond(
-        f"Pool Winner: **{winner_title}**\n"
-        f"**{mention}'s pick!**{rollover_text}"
+        f"Pool Winner: {winner_title}\n"
+        f"{mention}'s pick! {rollover_text}"
     )
 if ENABLE_TV_IN_PICK:
     @bot.slash_command(name="pick", description="Browse the movie or TV collection and add picks to today's pool")
