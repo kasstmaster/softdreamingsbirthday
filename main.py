@@ -929,7 +929,7 @@ async def random_pick(ctx):
     member = ctx.guild.get_member(winner_id)
     mention = member.mention if member else f"<@{winner_id}>"
     rollover_count = len(remaining_pool)
-    rollover_text = f"\n\n{rollover_count} movie{'' if rollover_count == 1 else 's'} rolled over to tomorrow's pool" if rollover_count else ""
+    rollover_text = f"\n\n{rollover_count} movie{'' if rollover_count == 1 else 's'} rolled over to the next pool" if rollover_count else ""
     await ctx.respond(
         f"Pool Winner: **{winner_title}**\n"
         f"**{mention}'s pick!**{rollover_text}"
