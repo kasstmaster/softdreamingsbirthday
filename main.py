@@ -444,7 +444,7 @@ async def post_daily_qotd():
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
     name_lower = name.lower()
     for role in guild.roles:
-        cleaned = role.name.replace("Christmas tree", "").replace("Jack O Lantern", "").replace("Snowflake", "").strip()
+        cleaned = role.name.replace("🎄", "").replace("🎃", "").replace("❄️", "").strip()
         if cleaned.lower() == name_lower:
             return role
     return None
