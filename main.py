@@ -722,6 +722,20 @@ async def on_member_join(member):
     except:
         pass
 
+@bot.event
+async def on_voice_state_update(member, before, after):
+    vc_id = 1331501272804884490
+    role = member.guild.get_role(1444555985728442390)
+    if not role:
+        return
+
+    if after.channel and after.channel.id == vc_id:
+        if role not in member.roles:
+            await member.add_roles(role, reason="Joined VC")
+    elif before.channel and before.channel.id == vc_id:
+        if role in member.roles:
+            await member.remove_roles(role, reason="Left VC")
+
 
 ############### COMMAND GROUPS ###############
 @bot.slash_command(name="commands", description="Admin / Announcer commands")
