@@ -932,11 +932,11 @@ async def random_pick(ctx):
     member = ctx.guild.get_member(winner_id)
     mention = member.mention if member else f"<@{winner_id}>"
     rollover_count = len(remaining_pool)
-    rollover_text = f"\n\n{rollover_count} movie{'' if rollover_count == 1 else 's'} rolled over to the next pool" if rollover_count else ""
     announcement = (
         f"# Tonight's Movie Winner!\n"
         f"**{winner_title}**\n"
-        f"{mention}'s pick! {rollover_text}"
+        f"{mention}'s pick!\n\n"
+        f"*Rate it 1-5*\n"
     )
     target_channel = ctx.guild.get_channel(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID)
     if target_channel is None:
