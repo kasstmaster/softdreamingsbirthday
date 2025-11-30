@@ -958,8 +958,7 @@ async def random_pick(ctx):
     rollover = len(request_pool[ctx.guild.id])
     rollover_text = f"\n\n{rollover} movie{'s' if rollover != 1 else ''} rolled over to the next pool" if rollover else ""
     announcement = (
-        f"# Tonight's Movie Winner!\n"
-        f"**{winner_title}**\n"
+        f"Pool Winner: **{winner_title}**\n"
         f"{mention}'s pick!\n\n"
         f"**Rate the movie:**"
     )
