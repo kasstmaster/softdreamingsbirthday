@@ -949,7 +949,7 @@ async def random_pick(ctx):
 
     msg = await channel.send(announcement)
 
-    for emoji in ["😍", "😃", "🙂", "🫤", "😑", "😒", "🤢"]:
+    for emoji in ["😍", "😃", "🙂", "🫤", "😒", "🤢"]:
         await msg.add_reaction(emoji)
 
     await ctx.followup.send("Winner announced + perfect rating bar!", ephemeral=True)
@@ -982,7 +982,7 @@ async def test_movie_announce(
 
     msg = await channel.send(announcement)
 
-    for emoji in ["😍", "😃", "🙂", "🫤", "😑", "😒", "🤢"]:
+    for emoji in ["😍", "😃", "🙂", "🫤", "😒", "🤢"]:
         await msg.add_reaction(emoji)
 
     await ctx.followup.send(f"Test posted → {channel.mention}", ephemeral=True)
