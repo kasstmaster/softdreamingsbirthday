@@ -596,17 +596,19 @@ class MediaPagerView(discord.ui.View):
         if guild is None:
             return await interaction.response.send_message("This can only be used in a server.", ephemeral=True)
         pool = request_pool.setdefault(guild.id, [])
-        user_indices = [i for i, (uid, _) in enumerate(pool) if uid == user.id]
-        if len(user_indices) >= MAX_POOL_ENTRIES_PER_USER:
+        if any(t.lower() == canon.lower() for _, t in pool):
+            return await interaction.response.send_message("**This movie is already in today’s pool!** Only one copy allowed.", ephemeral=True)
+        user_count = sum(1 for uid, _ in pool if uid == user.id)
+        if user_count >= MAX_POOL_ENTRIES_PER_USER:
             return await interaction.response.send_message(
-                f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use </replace:1444418642103107676> to swap one of your picks.",
+                f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use </replace:1444418642103107676> to swap one.",
                 ephemeral=True,
             )
         pool.append((user.id, canon))
         await save_request_pool()
         await update_pool_public_message(guild)
         await interaction.response.send_message(
-            f"Added **{canon}** • You now have `{len(user_indices) + 1}` pick(s) in the pool.",
+            f"Added **{canon}** • You now have `{user_count + 1}` pick(s) in the pool.",
             ephemeral=True,
         )
 
@@ -888,19 +890,18 @@ async def pick(ctx, title: discord.Option(str, autocomplete=movie_autocomplete))
     if not canon:
         return await ctx.respond("That movie isn't in the library.", ephemeral=True)
     pool = request_pool.setdefault(ctx.guild.id, [])
-    user_indices = [i for i, (uid, _) in enumerate(pool) if uid == ctx.author.id]
-    if len(user_indices) >= MAX_POOL_ENTRIES_PER_USER:
+    if any(t.lower() == canon.lower() for _, t in pool):
+        return await ctx.respond("**This movie is already in today’s pool!** Only one copy allowed.", ephemeral=True)
+    user_count = sum(1 for uid, _ in pool if uid == ctx.author.id)
+    if user_count >= MAX_POOL_ENTRIES_PER_USER:
         return await ctx.respond(
-            f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/replace` to swap one of your picks.",
+            f"You already have `{MAX_POOL_ENTRIES_PER_USER}` pick(s) in the pool. Use `/replace` to swap one.",
             ephemeral=True,
         )
     pool.append((ctx.author.id, canon))
     await save_request_pool()
     await update_pool_public_message(ctx.guild)
-    return await ctx.respond(
-        f"Added **{canon}** • You now have `{len(user_indices) + 1}` pick(s) in the pool.",
-        ephemeral=True,
-    )
+    await ctx.respond(f"Added **{canon}** • You now have `{user_count + 1}` pick(s) in the pool.", ephemeral=True)
 
 @bot.slash_command(name="replace", description="Replace one of your existing picks in the pool")
 async def pick_replace(
