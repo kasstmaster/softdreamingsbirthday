@@ -71,30 +71,23 @@ TV_STORAGE_CHANNEL_ID = _env_int("TV_STORAGE_CHANNEL_ID", 0)
 DEAD_CHAT_ROLE_ID = _env_int("DEAD_CHAT_ROLE_ID", 0)
 DEAD_CHAT_ROLE_NAME = os.getenv("DEAD_CHAT_ROLE_NAME", "Dead Chat")
 QOTD_CHANNEL_ID = _env_int("QOTD_CHANNEL_ID", 0)
-
 CHRISTMAS_ICON_URL = os.getenv("CHRISTMAS_ICON_URL", "")
 HALLOWEEN_ICON_URL = os.getenv("HALLOWEEN_ICON_URL", "")
 DEFAULT_ICON_URL = os.getenv("DEFAULT_ICON_URL", "")
-
 MAX_POOL_ENTRIES_PER_USER = _env_int("MAX_POOL_ENTRIES_PER_USER", 3)
-
 BIRTHDAY_MEMBER_ROLE_ID = _env_int("BIRTHDAY_MEMBER_ROLE_ID", 0)
-
 CHRISTMAS_ROLES = {"Cranberry": "Admin", "lights": "Original Member", "Grinch": "Member", "Christmas": "Bots"}
 HALLOWEEN_ROLES = {"Cauldron": "Admin", "Candy": "Original Member", "Witchy": "Member", "Halloween": "Bots"}
-
 DEAD_CHAT_COLORS = [
     discord.Color.red(), discord.Color.orange(), discord.Color.gold(),
     discord.Color.green(), discord.Color.blue(), discord.Color.purple(),
     discord.Color.magenta(), discord.Color.teal(),
 ]
-
 MONTH_CHOICES = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
 ]
 MONTH_TO_NUM = {name: f"{i:02d}" for i, name in enumerate(MONTH_CHOICES, start=1)}
-
 PAGE_SIZE = 25
 
 
