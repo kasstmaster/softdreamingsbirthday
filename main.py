@@ -65,7 +65,8 @@ BIRTHDAY_ROLE_ID = _env_int("BIRTHDAY_ROLE_ID", 1217937235840598026)
 BIRTHDAY_STORAGE_CHANNEL_ID = _env_int("BIRTHDAY_STORAGE_CHANNEL_ID", 1440912334813134868)
 BIRTHDAY_LIST_CHANNEL_ID = 1440989357535395911
 BIRTHDAY_LIST_MESSAGE_ID = 1440989655515271248
-MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID = 1444541741465342063
+MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID = 1444944070039306262
+SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID = _env_int("SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID", 0) #ratings
 MOVIE_STORAGE_CHANNEL_ID = _env_int("MOVIE_STORAGE_CHANNEL_ID", 0)
 TV_STORAGE_CHANNEL_ID = _env_int("TV_STORAGE_CHANNEL_ID", 0)
 DEAD_CHAT_ROLE_ID = _env_int("DEAD_CHAT_ROLE_ID", 0)
@@ -1107,19 +1108,27 @@ async def random_pick(ctx):
     member = ctx.guild.get_member(winner_id)
     mention = member.mention if member else f"<@{winner_id}>"
     rollover = len(request_pool[ctx.guild.id])
-    rollover_text = f"\n\n{rollover} movie{'s' if rollover != 1 else ''} rolled over to the next pool" if rollover else ""
-    announcement = (
+    rollover_text = (
+        f"\n\n{rollover} movie{'s' if rollover != 1 else ''} rolled over to the next pool"
+        if rollover else ""
+    )
+    first_text = (
         f"Pool Winner: **{winner_title}**\n"
         f"{mention}'s pick!{rollover_text}\n\n"
-        f"**Rate the movie:**"
     )
-    channel = ctx.guild.get_channel(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID)
-    if not channel:
-        return await ctx.followup.send("Announcement channel missing.", ephemeral=True)
-    msg = await channel.send(announcement)
-    for emoji in ["😍", "😃", "🙂", "🫤", "😒", "🤢"]:
-        await msg.add_reaction(emoji)
-    await ctx.followup.send("Winner announced + perfect rating bar!", ephemeral=True)
+    primary_channel = ctx.guild.get_channel(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID)
+    if primary_channel:
+        await primary_channel.send(first_text)
+    second_channel = ctx.guild.get_channel(SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID)
+    if second_channel:
+        second_text = (
+            f"**{winner_title}**\n"
+            f"**Rate the movie:**"
+        )
+        msg = await second_channel.send(second_text)
+        for emoji in ["😍", "😃", "🙂", "🫤", "😒", "🤢"]:
+            await msg.add_reaction(emoji)
+    await ctx.followup.send("Winner announced in both channels.", ephemeral=True)
 
 @bot.slash_command(name="test_movie_announce", description="[TEST] Preview winner message + rating bar")
 async def test_movie_announce(
