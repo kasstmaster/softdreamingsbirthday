@@ -855,8 +855,15 @@ async def commands(ctx):
     embed.set_footer(text="Also: /say")
     await ctx.respond(embed=embed, ephemeral=True)
 
-@bot.slash_command(name="editbotmsg", description="Edit a bot message in this channel with 4 lines")
-async def editbotmsg(ctx, message_id: str, line1: str, line2: str, line3: str, line4: str):
+@bot.slash_command(name="editbotmsg", description="Edit a bot message in this channel with up to 4 lines")
+async def editbotmsg(
+    ctx,
+    message_id: str,
+    line1: str,
+    line2: str = "",
+    line3: str = "",
+    line4: str = ""
+):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
         return await ctx.respond("Admin only.", ephemeral=True)
     try:
@@ -873,7 +880,7 @@ async def editbotmsg(ctx, message_id: str, line1: str, line2: str, line3: str, l
         return await ctx.respond("Error fetching that message.", ephemeral=True)
     if msg.author.id != bot.user.id:
         return await ctx.respond("That message was not sent by me.", ephemeral=True)
-    new_content = "\n".join([line1, line2, line3, line4])
+    new_content = "\n".join([line for line in [line1, line2, line3, line4] if line.strip() != ""])
     await msg.edit(content=new_content)
     await ctx.respond("Message updated.", ephemeral=True)
 
