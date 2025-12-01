@@ -255,14 +255,16 @@ async def initialize_media_lists():
     vals = ws.get_all_values()[1:]  # skip header
     movies = []
     for row in vals:
-        if len(row) < 4:
+        if not row:
             continue
-        title = row[0].strip()
-        poster = row[2].strip()
-        trailer = row[3].strip()
-        if title:
-            movies.append({"title": title, "poster": poster, "trailer": trailer})
+        title = row[0].strip() if len(row) > 0 else ""
+        if not title:
+            continue
+        poster  = row[2].strip() if len(row) > 2 else ""
+        trailer = row[3].strip() if len(row) > 3 else ""
+        movies.append({"title": title, "poster": poster, "trailer": trailer})
     movie_titles = movies
+    print(f"Loaded {len(movie_titles)} movies from sheet.")
 
 async def ensure_birthday_member_role(guild: discord.Guild, member: discord.Member):
     if BIRTHDAY_MEMBER_ROLE_ID == 0:
