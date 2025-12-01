@@ -533,11 +533,7 @@ async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
         pass
 
 def movie_night_time() -> str:
-    now = datetime.now(timezone.utc)
-    tonight = datetime.combine(now.date(), time(18, 0), tzinfo=timezone.utc)
-    if now >= tonight:
-        tonight = tonight.replace(day=tonight.day + 1)  # tomorrow
-    return f"MOVIE NIGHTS START AT <t:1764468000:t>"
+    return "MOVIE NIGHTS START AT 6PM PACIFIC PST"
 
 
 ############### VIEWS / UI COMPONENTS ###############
@@ -809,9 +805,13 @@ async def birthday_checker():
 async def on_ready():
     print(f"{bot.user} online!")
     bot.add_view(MovieEntryView())
-    await initialize_storage_message()
-    await initialize_media_lists()
-    await load_request_pool()
+    try:
+        await initialize_storage_message()
+        await initialize_media_lists()
+        await load_request_pool()
+    except Exception as e:
+        print("INIT ERROR:", repr(e))
+        traceback.print_exc()
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
     bot.loop.create_task(holiday_scheduler())
