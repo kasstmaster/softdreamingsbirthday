@@ -538,9 +538,11 @@ def _load_emoji_config_from_env(env_name: str) -> list[dict]:
     try:
         data = json.loads(raw)
         if isinstance(data, list):
+            print(f"{env_name} loaded {len(data)} item(s)")
             return data
-    except:
-        pass
+        print(f"{env_name} not a list: {type(data).__name__}")
+    except Exception as e:
+        print(f"{env_name} JSON error: {repr(e)}")
     return []
 
 def _collect_holiday_emoji_names() -> set[str]:
@@ -559,30 +561,38 @@ async def apply_holiday_emojis(guild: discord.Guild, holiday: str) -> int:
     env_name = "CHRISTMAS_EMOJIS" if holiday == "christmas" else "HALLOWEEN_EMOJIS"
     config = _load_emoji_config_from_env(env_name)
     if not config:
+        print(f"{env_name} is empty or invalid")
         return 0
     created = 0
     existing_names = {e.name for e in guild.emojis}
     async with aiohttp.ClientSession() as session:
         for item in config:
             if not isinstance(item, dict):
+                print(f"{env_name} bad item (not dict): {item!r}")
                 continue
             name = item.get("name")
             url = item.get("url")
             if not isinstance(name, str) or not isinstance(url, str):
+                print(f"{env_name} bad types: name={type(name).__name__}, url={type(url).__name__}")
                 continue
             if not name or not url:
+                print(f"{env_name} missing name or url: {item!r}")
                 continue
             if name in existing_names:
+                print(f"Emoji {name} already exists, skipping")
                 continue
             try:
                 async with session.get(url) as resp:
+                    print(f"FETCH {name} {url} -> {resp.status}")
                     if resp.status != 200:
                         continue
                     data = await resp.read()
                 emoji = await guild.create_custom_emoji(name=name, image=data, reason=f"{holiday} emoji")
+                print(f"EMOJI_CREATED {emoji.name} size={len(data)}")
                 existing_names.add(emoji.name)
                 created += 1
-            except:
+            except Exception as e:
+                print(f"EMOJI_ERROR {name}: {repr(e)}")
                 continue
     return created
 
