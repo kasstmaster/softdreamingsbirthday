@@ -564,7 +564,8 @@ async def apply_holiday_emojis(guild: discord.Guild, holiday: str) -> int:
         print(f"{env_name} is empty or invalid")
         return 0
     created = 0
-    existing_names = {e.name for e in guild.emojis}
+    if hasattr(guild, "emoji_limit") and len(existing_names) >= guild.emoji_limit:
+    return 0
     async with aiohttp.ClientSession() as session:
         for item in config:
             if not isinstance(item, dict):
