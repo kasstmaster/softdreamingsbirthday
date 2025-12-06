@@ -1,6 +1,4 @@
 # ============================================================
-# BOT NAME: MEMBER BOT
-# ============================================================
 # RULES FOR CHATGPT AND GROK (DO NOT VIOLATE)
 # • Use ONLY these sections, in this exact order:
 #   ############### IMPORTS ###############
@@ -14,32 +12,44 @@
 #   ############### COMMAND GROUPS ###############
 #   ############### ON_READY & BOT START ###############
 # • Do NOT add any other sections.
-# • Do NOT add comments, notes, or explanations inside the code.
+# • Do NOT add comments inside the code. No inline labels.
 # ============================================================
-# Discord Server: Soft Dreamings
-#    Small private server • 25 members • ages 25-40
-#    Vibe: Close friends, chill hangout with movie nights, daily QOTD, video games, and role games
-#    Our two custom bots run everything: Admin Bot & Member Bot 
-# Fun channels (general channels not listed here)
-#   #• k – We just type “k” (yes really)
-#   #• codes – Where we post video game codes.
-#   #• graveyard – Only visible to the current Dead Chat holder. Whoever keeps the chat alive holds the @Dead Chat role. Contagious “plague” events: triggers @Infected role for 3 days if they steal Dead Chat during outbreak. Monthly random prize drops (movie request, Nitro, Steam card) for the current holder.
-#   #• movies – Where the movie night pool is posted.
-#   #• ratings – Where we rate movies we’ve just watched.
-#   #• QOTD – The most used feature in our server, hilarious responses.
-# Role: Owner
-#   Permissions: Full permissions
-#   Commands: All commands
-# Role: Admins
-#   Permissions: All permissions listed below PLUS view and send messages in the members logging channel, create expressions, manage expressions, change nickname, manage nicknames, kick/approve/reject/ban/timeout members, create public threads, manage messages, pin messages, bypass slowmode (even though we dont do slowmode), send voice messages, create polls, and mute/deafen/move members
-#   Commands: All commands listed below
-# Role: Trusted
-#   Permissions: All permissions listed below PLUS send messages in the announcements channel and change the VC status
-#   Commands: All commands listed below PLUS /random, /qotd_send, /random, /remove_for, and /set for
-# Role: Member
-#   Permissions: View channels, send messages/create posts, send messages in threads and posts, send embed links, attach files, add reactions, use external emojis, read message history, connect/speak/video/use soundboard/use external sounds/use voice activity in VC, and use application commands
-#   Commands: /birthdays, /color (if they have the dead chat role), /pick, /pool, /replace, /search, and /set
+# BOT NAME: MEMBER BOT
+# PURPOSE
+# • Movie Night: sheet sync, pool system, random winner, rating announcements
+# • Birthdays: storage, daily role assignment, public birthday list
+# • QOTD: seasonal sheet selection, daily scheduler, posting logic
+# • Seasonal Themes: holiday roles, emojis, server/bot icons
+# • Member Tools: Dead Chat color cycle, VC-status role, admin utilities
 # ============================================================
+# SERVER: Soft Dreamings (≈25 members, ages 25–40)
+# • Private friend group; movie nights, QOTD, games, light role events
+# • Bots: Admin Bot + Member Bot (this file)
+# • Notable Channels:
+#   - #k • one-letter chat
+#   - #codes • game codes
+#   - #graveyard • Dead Chat role, plague events, monthly prize drops
+#   - #movies • movie pool
+#   - #ratings • post-watch ratings
+#   - #qotd • daily questions
+# ROLE ACCESS
+# OWNER
+# • Permissions: Full
+# • Commands: All
+# ADMINS
+# • Permissions: Full admin/moderation
+# • Commands: All in this file
+# TRUSTED
+# • Permissions: Member + announcements + VC status
+# • Commands:
+#   /birthdays /birthdays_public /media_reload /library_sync
+#   /pool_public /pool_remove /qotd_send /random /set_for /remove_for
+# MEMBER
+# • Permissions: Standard chat + VC + app commands
+# • Commands:
+#   /birthdays /set /color /pick /pool /replace /search
+# ============================================================
+
 
 ############### IMPORTS ###############
 import os
