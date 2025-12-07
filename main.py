@@ -60,6 +60,7 @@ import discord
 import random as pyrandom
 import gspread
 import traceback
+import sys
 from datetime import datetime, time, timezone
 from google.oauth2.service_account import Credentials
 
@@ -120,6 +121,8 @@ BIRTHDAY_LIST_MESSAGE_ID = _env_int("BIRTHDAY_LIST_MESSAGE_ID", 0)
 MONTH_CHOICES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 MONTH_TO_NUM = {name: f"{i:02d}" for i, name in enumerate(MONTH_CHOICES, start=1)}
 
+MOD_LOG_THREAD_ID = _env_int("MOD_LOG_THREAD_ID", 0)
+BOT_LOG_CHANNEL_ID = _env_int("BOT_LOG_CHANNEL_ID", 0)
 
 
 ############### GLOBAL STATE / STORAGE ###############
@@ -131,6 +134,33 @@ request_pool: dict[int, list[tuple[int, str]]] = {}
 
 
 ############### HELPER FUNCTIONS ###############
+async def log_to_thread(content: str):
+    channel = bot.get_channel(MOD_LOG_THREAD_ID)
+    if not channel:
+        return
+    try:
+        await channel.send(content)
+    except Exception:
+        pass
+
+async def log_to_bot_channel(content: str):
+    if BOT_LOG_CHANNEL_ID == 0:
+        return await log_to_thread(f"[BOT] {content}")
+    channel = bot.get_channel(BOT_LOG_CHANNEL_ID)
+    if not channel:
+        return
+    try:
+        await channel.send(content)
+    except Exception:
+        pass
+
+async def log_exception(tag: str, exc: Exception):
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    text = f"{tag}: {exc}\n{tb}"
+    if len(text) > 1900:
+        text = text[:1900]
+    await log_to_bot_channel(text)
+
 def build_mm_dd(month_name: str, day: int) -> str | None:
     month_num = MONTH_TO_NUM.get(month_name)
     if not month_num or not (1 <= day <= 31):
@@ -481,7 +511,7 @@ async def post_daily_qotd():
         if question_text and (not status_a or not status_b):
             unused.append(row)
     if not unused:
-        print("QOTD: All questions used; resetting.")
+        await log_to_bot_channel("QOTD: All questions used; resetting.")
         worksheet.update("A2:B", [[""] * 2 for _ in range(len(questions))])
         unused = questions
     chosen = pyrandom.choice(unused)
@@ -496,7 +526,7 @@ async def post_daily_qotd():
     row_idx = questions.index(chosen) + 2
     status_col = "A" if chosen[1].strip() else "B"
     worksheet.update(f"{status_col}{row_idx}", [[f"Used {datetime.utcnow().strftime('%Y-%m-%d')}"]])
-    print(f"QOTD: Posted question from row {row_idx} ({season}).")
+    await log_to_bot_channel(f"QOTD: Posted question from row {row_idx} ({season}).")
 
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
     name_lower = name.lower()
@@ -616,8 +646,9 @@ async def apply_holiday_emojis(guild: discord.Guild, holiday: str) -> int:
                 existing_names.add(emoji.name)
                 created += 1
             except Exception as e:
-                print(f"EMOJI_ERROR {name}: {repr(e)}")
+                await log_exception(f"EMOJI_ERROR_{name}", e)
                 continue
+    await log_to_bot_channel(f"{env_name}: created {created} emoji(s) in guild {guild.id}.")
     return created
 
 async def clear_holiday_emojis(guild: discord.Guild) -> int:
@@ -631,8 +662,10 @@ async def clear_holiday_emojis(guild: discord.Guild) -> int:
         try:
             await emoji.delete(reason="Holiday emoji cleanup")
             removed += 1
-        except:
+        except Exception as e:
+            await log_exception(f"HOLIDAY_EMOJI_REMOVE_{emoji.name}", e)
             continue
+    await log_to_bot_channel(f"Holiday emoji cleanup: removed {removed} emoji(s) in guild {guild.id}.")
     return removed
 
 def movie_night_time() -> str:
@@ -850,14 +883,14 @@ async def qotd_scheduler():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 17
     TARGET_MINUTE = 0
+    await log_to_bot_channel("qotd_scheduler started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             try:
                 await post_daily_qotd()
             except Exception as e:
-                print("QOTD scheduler error:", repr(e))
-                traceback.print_exc()
+                await log_exception("qotd_scheduler", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
@@ -865,24 +898,31 @@ async def holiday_scheduler():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 9
     TARGET_MINUTE = 0
+    await log_to_bot_channel("holiday_scheduler started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             today = now.strftime("%m-%d")
             for guild in bot.guilds:
-                if "10-01" <= today <= "10-31":
-                    await clear_holiday_theme(guild)
-                    await apply_holiday_theme(guild, "halloween")
-                    await clear_holiday_emojis(guild)
-                    await apply_holiday_emojis(guild, "halloween")
-                elif "12-01" <= today <= "12-26":
-                    await clear_holiday_theme(guild)
-                    await apply_holiday_theme(guild, "christmas")
-                    await clear_holiday_emojis(guild)
-                    await apply_holiday_emojis(guild, "christmas")
-                else:
-                    await clear_holiday_theme(guild)
-                    await clear_holiday_emojis(guild)
+                try:
+                    if "10-01" <= today <= "10-31":
+                        removed_roles = await clear_holiday_theme(guild)
+                        removed_emojis = await clear_holiday_emojis(guild)
+                        added_roles = await apply_holiday_theme(guild, "halloween")
+                        added_emojis = await apply_holiday_emojis(guild, "halloween")
+                        await log_to_bot_channel(f"holiday_scheduler halloween guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
+                    elif "12-01" <= today <= "12-26":
+                        removed_roles = await clear_holiday_theme(guild)
+                        removed_emojis = await clear_holiday_emojis(guild)
+                        added_roles = await apply_holiday_theme(guild, "christmas")
+                        added_emojis = await apply_holiday_emojis(guild, "christmas")
+                        await log_to_bot_channel(f"holiday_scheduler christmas guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
+                    else:
+                        removed_roles = await clear_holiday_theme(guild)
+                        removed_emojis = await clear_holiday_emojis(guild)
+                        await log_to_bot_channel(f"holiday_scheduler cleared guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis}")
+                except Exception as e:
+                    await log_exception(f"holiday_scheduler_guild_{guild.id}", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
@@ -890,22 +930,27 @@ async def birthday_checker():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 15
     TARGET_MINUTE = 0
+    await log_to_bot_channel("birthday_checker started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             today = now.strftime("%m-%d")
             for guild in bot.guilds:
-                role = guild.get_role(BIRTHDAY_ROLE_ID)
-                if not role:
-                    continue
-                bdays = await get_guild_birthdays(guild.id)
-                for member in guild.members:
-                    if bdays.get(str(member.id)) == today:
-                        if role not in member.roles:
-                            await member.add_roles(role, reason="Birthday!")
-                    else:
-                        if role in member.roles:
-                            await member.remove_roles(role, reason="Birthday over")
+                try:
+                    role = guild.get_role(BIRTHDAY_ROLE_ID)
+                    if not role:
+                        continue
+                    bdays = await get_guild_birthdays(guild.id)
+                    for member in guild.members:
+                        if bdays.get(str(member.id)) == today:
+                            if role not in member.roles:
+                                await member.add_roles(role, reason="Birthday!")
+                        else:
+                            if role in member.roles:
+                                await member.remove_roles(role, reason="Birthday over")
+                    await log_to_bot_channel(f"birthday_checker guild={guild.id} today={today} birthdays_tracked={len(bdays)}")
+                except Exception as e:
+                    await log_exception(f"birthday_checker_guild_{guild.id}", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
@@ -919,12 +964,14 @@ async def on_ready():
         await initialize_storage_message()
         await initialize_media_lists()
         await load_request_pool()
+        await log_to_bot_channel(f"Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
+        await log_to_bot_channel("Startup: storage, media lists, and request pool initialized.")
     except Exception as e:
-        print("INIT ERROR:", repr(e))
-        traceback.print_exc()
+        await log_exception("on_ready_init", e)
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
     bot.loop.create_task(holiday_scheduler())
+    await log_to_bot_channel("Schedulers started: birthday_checker, qotd_scheduler, holiday_scheduler.")
     print("QOTD scheduler started + Google Sheets ready!")
 
 @bot.event
@@ -947,6 +994,22 @@ async def on_voice_state_update(member, before, after):
     elif before.channel and before.channel.id == vc_id:
         if role in member.roles:
             await member.remove_roles(role, reason="Left VC")
+
+@bot.event
+async def on_application_command_error(ctx, error):
+    await log_exception("application_command_error", error)
+    try:
+        await ctx.respond("An internal error occurred.", ephemeral=True)
+    except Exception:
+        pass
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    exc_type, exc, tb = sys.exc_info()
+    if exc is None:
+        await log_to_bot_channel(f"Unhandled error in event {event} with no exception info.")
+    else:
+        await log_exception(f"Unhandled error in event {event}", exc)
 
 
 ############### COMMAND GROUPS ###############
@@ -1242,9 +1305,8 @@ async def qotd_send(ctx):
     try:
         await post_daily_qotd()
     except Exception as e:
-        print("qotd_send ERROR:", repr(e))
-        traceback.print_exc()
-        return await ctx.followup.send(f"QOTD error: `{type(e).__name__}` – `{repr(e)}`", ephemeral=True)
+        await log_exception("qotd_send", e)
+        return await ctx.followup.send("QOTD error: an internal error occurred.", ephemeral=True)
     await ctx.followup.send("QOTD posted!", ephemeral=True)
 
 @bot.slash_command(name="pool_public", description="Create or update the public pool message")
