@@ -149,6 +149,91 @@ async def log_exception(tag: str, exc: Exception):
         text = text[:1900]
     await log_to_thread(text)
 
+async def run_startup_checks():
+    lines = []
+    lines.append("Startup check report:")
+    lines.append("")
+    lines.append("[STORAGE]")
+
+    storage_ok = False
+    try:
+        data = await _load_storage_message()
+        storage_ok = isinstance(data, dict)
+    except Exception as e:
+        await log_exception("startup_check_storage", e)
+        storage_ok = False
+    lines.append("✅ Birthday storage" if storage_ok else "⚠️ Birthday storage")
+
+    pool_ok = False
+    try:
+        pool = await _load_pool_message()
+        pool_ok = isinstance(pool, dict)
+    except Exception as e:
+        await log_exception("startup_check_pool", e)
+        pool_ok = False
+    lines.append("✅ Pool storage" if pool_ok else "⚠️ Pool storage")
+
+    lines.append("")
+    lines.append("[QOTD / MEDIA]")
+
+    sheets_ok = gc is not None and bool(SHEET_ID)
+    lines.append("✅ Google Sheets client" if sheets_ok else "⚠️ Google Sheets client")
+
+    movies_ok = isinstance(movie_titles, list)
+    count = len(movie_titles) if movies_ok else 0
+    if movies_ok and count > 0:
+        lines.append(f"✅ Movie list loaded ({count} item(s))")
+    elif movies_ok:
+        lines.append("⚠️ Movie list loaded but empty")
+    else:
+        lines.append("⚠️ Movie list not initialized")
+
+    lines.append("")
+    lines.append("[RUNTIME CONFIG]")
+
+    guild = bot.guilds[0] if bot.guilds else None
+    if not guild:
+        lines.append("⚠️ No guilds connected")
+    else:
+        def chan_ok(cid: int) -> bool:
+            return bool(cid) and guild.get_channel(cid) is not None
+
+        if chan_ok(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID) and chan_ok(SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID):
+            lines.append("✅ Movie announcement channels")
+        else:
+            lines.append("⚠️ Movie announcement channels")
+
+        lines.append("✅ QOTD channel" if chan_ok(QOTD_CHANNEL_ID) else "⚠️ QOTD channel")
+
+        lines.append(
+            "✅ Birthday storage channel"
+            if chan_ok(BIRTHDAY_STORAGE_CHANNEL_ID)
+            else "⚠️ Birthday storage channel"
+        )
+
+        if BIRTHDAY_LIST_CHANNEL_ID:
+            lines.append(
+                "✅ Birthday list channel"
+                if chan_ok(BIRTHDAY_LIST_CHANNEL_ID)
+                else "⚠️ Birthday list channel"
+            )
+        else:
+            lines.append("⚠️ Birthday list channel not configured")
+
+    lines.append("")
+    lines.append("[HOLIDAY THEMES]")
+
+    emoji_names = _collect_holiday_emoji_names()
+    lines.append("✅ Holiday emoji config" if emoji_names else "⚠️ Holiday emoji config")
+
+    lines.append("✅ Christmas role templates" if CHRISTMAS_ROLES else "⚠️ Christmas role templates")
+    lines.append("✅ Halloween role templates" if HALLOWEEN_ROLES else "⚠️ Halloween role templates")
+
+    text = "\n".join(lines)
+    if len(text) > 1900:
+        text = text[:1900]
+    await log_to_thread(text)
+
 def build_mm_dd(month_name: str, day: int) -> str | None:
     month_num = MONTH_TO_NUM.get(month_name)
     if not month_num or not (1 <= day <= 31):
@@ -952,10 +1037,14 @@ async def on_ready():
         await initialize_storage_message()
         await initialize_media_lists()
         await load_request_pool()
-        await log_to_thread(f"Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
         await log_to_thread("Startup: storage, media lists, and request pool initialized.")
     except Exception as e:
         await log_exception("on_ready_init", e)
+
+    await run_startup_checks()
+    await log_to_thread("All systems passed basic storage + runtime checks.")
+    await log_to_thread(f"[STARTUP] Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
+
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
     bot.loop.create_task(holiday_scheduler())
