@@ -1023,7 +1023,7 @@ async def on_ready():
         await initialize_storage_message()
         await initialize_media_lists()
         await load_request_pool()
-        await log_to_thread("Startup: storage, media lists, and request pool initialized.")
+        await log_to_thread("Startup: storage, media lists, and request pool initialized. [member-bot v2]")
     except Exception as e:
         await log_exception("on_ready_init", e)
 
