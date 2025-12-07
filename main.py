@@ -156,16 +156,16 @@ async def run_startup_checks():
     lines.append("[LOGGING]")
     log_channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID else None
     if BOT_LOG_THREAD_ID == 0:
-        lines.append("⚠️ BOT_LOG_THREAD_ID missing or zero (Log thread ID not provided; no system logs can be delivered.)")
+        lines.append("⚠️ **Log thread ID** — BOT_LOG_THREAD_ID is missing or zero, so no system logs can be delivered to the log thread.")
     elif log_channel is None:
-        lines.append("⚠️ Log thread channel not found; logging to thread will fail (The configured log thread ID does not exist or is inaccessible.)")
+        lines.append("⚠️ **Log thread channel** — The configured BOT_LOG_THREAD_ID does not resolve to an accessible channel, so thread logging will fail.")
     else:
         lines.append(f"✅ Log thread configured in channel {BOT_LOG_THREAD_ID}")
     lines.append("")
 
     lines.append("[STORAGE]")
 
-    storage_ok = False
+    storage_ok = False    # birthday JSON validity
     try:
         data = await _load_storage_message()
         storage_ok = isinstance(data, dict)
@@ -175,7 +175,7 @@ async def run_startup_checks():
     if storage_ok:
         lines.append("✅ Birthday storage data")
     else:
-        lines.append("⚠️ Birthday storage data (Birthday JSON could not be loaded or parsed; data may be lost or unreadable.)")
+        lines.append("⚠️ **Birthday storage data** — Birthday JSON could not be loaded or parsed, so stored birthdays may be lost or unreadable.")
 
     birthday_storage_binding_ok = (
         storage_message_id is not None
@@ -185,9 +185,9 @@ async def run_startup_checks():
     if birthday_storage_binding_ok:
         lines.append(f"✅ Birthday storage message binding (msg_id={storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
     else:
-        lines.append("⚠️ Birthday storage message binding (missing channel or message) (The bot cannot find or access the birthday storage message required for persistence.)")
+        lines.append("⚠️ **Birthday storage message binding** — The birthday storage message or its channel is missing or inaccessible, so birthday data cannot be persisted.")
 
-    pool_ok = False
+    pool_ok = False    # pool JSON validity
     try:
         pool = await _load_pool_message()
         pool_ok = isinstance(pool, dict)
@@ -197,7 +197,7 @@ async def run_startup_checks():
     if pool_ok:
         lines.append("✅ Pool storage data")
     else:
-        lines.append("⚠️ Pool storage data (Pool JSON could not be loaded or parsed; the movie pool may reset or corrupt.)")
+        lines.append("⚠️ **Pool storage data** — Pool JSON could not be loaded or parsed, so the movie pool may reset or become corrupt.")
 
     pool_storage_binding_ok = (
         pool_storage_message_id is not None
@@ -207,7 +207,7 @@ async def run_startup_checks():
     if pool_storage_binding_ok:
         lines.append(f"✅ Pool storage message binding (msg_id={pool_storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
     else:
-        lines.append("⚠️ Pool storage message binding (missing channel or message) (The bot cannot find or access the pool storage message required for persistence.)")
+        lines.append("⚠️ **Pool storage message binding** — The pool storage message or its channel is missing or inaccessible, so pool data cannot be persisted.")
 
     lines.append("")
     lines.append("[QOTD / MEDIA]")
@@ -216,16 +216,16 @@ async def run_startup_checks():
     if sheets_ok:
         lines.append("✅ Google Sheets client")
     else:
-        lines.append("⚠️ Google Sheets client (Google credentials or sheet ID invalid; QOTD and movie library cannot load.)")
+        lines.append("⚠️ **Google Sheets client** — Google credentials or sheet ID are invalid or missing, so QOTD and the movie library cannot be loaded from Sheets.")
 
     movies_ok = isinstance(movie_titles, list)
     count = len(movie_titles) if movies_ok else 0
     if movies_ok and count > 0:
         lines.append(f"✅ Movie list loaded ({count} item(s))")
     elif movies_ok:
-        lines.append("⚠️ Movie list loaded but empty (Sheets loaded successfully but contains no movie entries.)")
+        lines.append("⚠️ **Movie list state** — Movie list loaded as an empty list, so no movies are available for picks or pool operations.")
     else:
-        lines.append("⚠️ Movie list not initialized (Movie list failed to load; media-based commands will break.)")
+        lines.append("⚠️ **Movie list initialization** — Movie list is not a valid list object, so media-based commands depending on it will fail.")
 
     lines.append("")
     lines.append("[HOLIDAY THEMES]")
@@ -234,38 +234,38 @@ async def run_startup_checks():
     if emoji_names:
         lines.append(f"✅ Holiday emoji config ({len(emoji_names)} name(s))")
     else:
-        lines.append("⚠️ Holiday emoji config (Emoji environment JSON missing, invalid, or empty; holiday emoji creation will fail.)")
+        lines.append("⚠️ **Holiday emoji config** — Holiday emoji environment JSON is missing, invalid, or empty, so seasonal emojis cannot be created.")
 
     if CHRISTMAS_ROLES:
         lines.append("✅ Christmas role templates")
     else:
-        lines.append("⚠️ Christmas role templates (Christmas role mapping not defined; seasonal roles cannot be assigned.)")
+        lines.append("⚠️ **Christmas role templates** — Christmas role mapping is not defined, so seasonal Christmas roles cannot be assigned.")
 
     if HALLOWEEN_ROLES:
         lines.append("✅ Halloween role templates")
     else:
-        lines.append("⚠️ Halloween role templates (Halloween role mapping not defined; seasonal roles cannot be assigned.)")
+        lines.append("⚠️ **Halloween role templates** — Halloween role mapping is not defined, so seasonal Halloween roles cannot be assigned.")
 
     if DEFAULT_ICON_URL:
         lines.append("✅ Default icon URL")
     else:
-        lines.append("⚠️ Default icon URL missing (Missing fallback icon; the bot/server icon cannot revert after a holiday.)")
+        lines.append("⚠️ **Default icon URL** — DEFAULT_ICON_URL is missing, so the bot and server icons cannot revert to a non-holiday default.")
 
     if CHRISTMAS_ICON_URL:
         lines.append("✅ Christmas icon URL")
     else:
-        lines.append("⚠️ Christmas icon URL missing (Missing holiday icon; Christmas theme cannot apply server/bot icon.)")
+        lines.append("⚠️ **Christmas icon URL** — CHRISTMAS_ICON_URL is missing, so the Christmas theme cannot update the bot or server icon.")
 
     if HALLOWEEN_ICON_URL:
         lines.append("✅ Halloween icon URL")
     else:
-        lines.append("⚠️ Halloween icon URL missing (Missing holiday icon; Halloween theme cannot apply server/bot icon.)")
+        lines.append("⚠️ **Halloween icon URL** — HALLOWEEN_ICON_URL is missing, so the Halloween theme cannot update the bot or server icon.")
 
     lines.append("")
     lines.append("[PER-GUILD CONFIG]")
 
     if not bot.guilds:
-        lines.append("⚠️ No guilds connected (The bot is not connected to any guild; no features can run.)")
+        lines.append("⚠️ **Guild connectivity** — The bot is not connected to any guild, so no server features can run.")
     else:
         for guild in bot.guilds:
             lines.append(f"- Guild: {guild.name} ({guild.id})")
@@ -276,28 +276,28 @@ async def run_startup_checks():
             if chan_ok(RATING_CHANNEL_ID):
                 lines.append("  ✅ Movie rating channel")
             else:
-                lines.append("  ⚠️ Movie rating channel missing or invalid (The rating channel ID is not configured or does not exist in this guild.)")
+                lines.append("  ⚠️ **Movie rating channel** — The configured RATING_CHANNEL_ID is missing or not a valid channel in this guild, so rating posts cannot be created.")
 
             if chan_ok(QOTD_CHANNEL_ID):
                 lines.append("  ✅ QOTD channel")
             else:
-                lines.append("  ⚠️ QOTD channel missing or invalid (The QOTD delivery channel is missing or inaccessible.)")
+                lines.append("  ⚠️ **QOTD channel** — The configured QOTD_CHANNEL_ID is missing or not a valid channel in this guild, so QOTD messages cannot be delivered.")
 
             if chan_ok(BIRTHDAY_STORAGE_CHANNEL_ID):
                 lines.append("  ✅ Birthday storage channel")
             else:
-                lines.append("  ⚠️ Birthday storage channel missing or invalid (The channel containing birthday & pool JSON storage cannot be found.)")
+                lines.append("  ⚠️ **Birthday storage channel** — The configured BIRTHDAY_STORAGE_CHANNEL_ID is missing or not a valid channel in this guild, so storage messages cannot be maintained.")
 
             if chan_ok(MOVIE_STORAGE_CHANNEL_ID):
                 lines.append("  ✅ Movie storage channel")
             else:
-                lines.append("  ⚠️ Movie storage channel missing or invalid (The channel used for per-movie library messages does not exist.)")
+                lines.append("  ⚠️ **Movie storage channel** — The configured MOVIE_STORAGE_CHANNEL_ID is missing or not a valid channel in this guild, so movie library messages cannot be synced.")
 
             birthday_role = guild.get_role(BIRTHDAY_ROLE_ID) if BIRTHDAY_ROLE_ID != 0 else None
             if BIRTHDAY_ROLE_ID == 0:
-                lines.append("  ⚠️ BIRTHDAY_ROLE_ID not configured (Environment variable not set; birthday role automation disabled.)")
+                lines.append("  ⚠️ **Birthday role ID** — BIRTHDAY_ROLE_ID is not configured, so the birthday role cannot be automatically assigned or removed.")
             elif birthday_role is None:
-                lines.append(f"  ⚠️ Birthday role with id {BIRTHDAY_ROLE_ID} not found (The configured birthday role ID does not exist in the guild.)")
+                lines.append(f"  ⚠️ **Birthday role lookup** — The configured BIRTHDAY_ROLE_ID ({BIRTHDAY_ROLE_ID}) does not match any role in this guild, so birthday role automation will fail.")
             else:
                 lines.append(f"  ✅ Birthday role found ({birthday_role.name}, id={BIRTHDAY_ROLE_ID})")
 
@@ -308,9 +308,9 @@ async def run_startup_checks():
                 dead_chat_role = discord.utils.get(guild.roles, name=DEAD_CHAT_ROLE_NAME)
 
             if DEAD_CHAT_ROLE_ID == 0 and not DEAD_CHAT_ROLE_NAME:
-                lines.append("  ⚠️ Dead Chat role not configured (No ID or name provided; the color-cycle system cannot run.)")
+                lines.append("  ⚠️ **Dead Chat role config** — Neither DEAD_CHAT_ROLE_ID nor DEAD_CHAT_ROLE_NAME is configured, so the Dead Chat color cycling command cannot operate.")
             elif dead_chat_role is None:
-                lines.append("  ⚠️ Dead Chat role not found (The role name/ID does not exist in the guild; color cycling will fail.)")
+                lines.append("  ⚠️ **Dead Chat role lookup** — The configured Dead Chat role ID or name does not match any role in this guild, so color cycling will fail.")
             else:
                 lines.append(f"  ✅ Dead Chat role found ({dead_chat_role.name}, id={dead_chat_role.id})")
 
@@ -320,12 +320,12 @@ async def run_startup_checks():
             vc_role = guild.get_role(vc_role_id)
 
             if vc_channel is None:
-                lines.append(f"  ⚠️ VC channel {vc_id} not found for VC-status role tracking (The voice channel used for VC-role detection is missing.)")
+                lines.append(f"  ⚠️ **VC tracking channel** — The hardcoded VC channel ID {vc_id} does not resolve in this guild, so VC-status role tracking cannot run.")
             else:
                 lines.append(f"  ✅ VC channel found for VC-status role tracking ({vc_channel.name}, id={vc_id})")
 
             if vc_role is None:
-                lines.append(f"  ⚠️ VC-status role {vc_role_id} not found (The role that should be assigned on VC join does not exist.)")
+                lines.append(f"  ⚠️ **VC-status role lookup** — The hardcoded VC-status role ID {vc_role_id} does not resolve to a role in this guild, so join/leave role automation will fail.")
             else:
                 lines.append(f"  ✅ VC-status role found ({vc_role.name}, id={vc_role_id})")
 
