@@ -707,6 +707,25 @@ def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
             return role
     return None
 
+async def apply_theme_for_today_in_guild(guild: discord.Guild, today: str | None = None):
+    if today is None:
+        today = datetime.utcnow().strftime("%m-%d")
+    removed_roles = await clear_holiday_theme(guild)
+    removed_emojis = await clear_holiday_emojis(guild)
+    added_roles = 0
+    added_emojis = 0
+    mode = "none"
+    if "10-01" <= today <= "10-31":
+        added_roles = await apply_holiday_theme(guild, "halloween")
+        added_emojis = await apply_holiday_emojis(guild, "halloween")
+        mode = "halloween"
+    elif "12-01" <= today <= "12-26":
+        added_roles = await apply_holiday_theme(guild, "christmas")
+        added_emojis = await apply_holiday_emojis(guild, "christmas")
+        mode = "christmas"
+    await log_to_thread(f"theme_update guild={guild.id} today={today} mode={mode} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
+    return mode, removed_roles, removed_emojis, added_roles, added_emojis
+
 async def apply_holiday_theme(guild: discord.Guild, holiday: str) -> int:
     role_map = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
     added = 0
@@ -1076,22 +1095,7 @@ async def holiday_scheduler():
             today = now.strftime("%m-%d")
             for guild in bot.guilds:
                 try:
-                    if "10-01" <= today <= "10-31":
-                        removed_roles = await clear_holiday_theme(guild)
-                        removed_emojis = await clear_holiday_emojis(guild)
-                        added_roles = await apply_holiday_theme(guild, "halloween")
-                        added_emojis = await apply_holiday_emojis(guild, "halloween")
-                        await log_to_thread(f"holiday_scheduler halloween guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
-                    elif "12-01" <= today <= "12-26":
-                        removed_roles = await clear_holiday_theme(guild)
-                        removed_emojis = await clear_holiday_emojis(guild)
-                        added_roles = await apply_holiday_theme(guild, "christmas")
-                        added_emojis = await apply_holiday_emojis(guild, "christmas")
-                        await log_to_thread(f"holiday_scheduler christmas guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
-                    else:
-                        removed_roles = await clear_holiday_theme(guild)
-                        removed_emojis = await clear_holiday_emojis(guild)
-                        await log_to_thread(f"holiday_scheduler cleared guild={guild.id} roles_cleared={removed_roles} emojis_cleared={removed_emojis}")
+                    await apply_theme_for_today_in_guild(guild, today)
                 except Exception as e:
                     await log_exception(f"holiday_scheduler_guild_{guild.id}", e)
             await asyncio.sleep(61)
@@ -1511,6 +1515,24 @@ async def pool_public(ctx):
     pool_message_locations[ctx.guild.id] = (ctx.channel.id, msg.id)
     await save_request_pool()
     await ctx.respond("Created a new public pool message in this channel.", ephemeral=True)
+
+@bot.slash_command(name="theme_update", description="Recheck the date and apply the current seasonal theme for this server")
+async def theme_update(ctx):
+    if ctx.guild is None:
+        return await ctx.respond("This can only be used in a server.", ephemeral=True)
+    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+        return await ctx.respond("Admin only.", ephemeral=True)
+    await ctx.defer(ephemeral=True)
+    today = datetime.utcnow().strftime("%m-%d")
+    mode, removed_roles, removed_emojis, added_roles, added_emojis = await apply_theme_for_today_in_guild(ctx.guild, today)
+    if mode == "halloween":
+        label = "Halloween theme applied."
+    elif mode == "christmas":
+        label = "Christmas theme applied."
+    else:
+        label = "Cleared holiday theme and reverted to default."
+    summary = f"{label}\nRoles cleared: {removed_roles}\nEmojis cleared: {removed_emojis}\nRoles added: {added_roles}\nEmojis added: {added_emojis}"
+    await ctx.followup.send(summary, ephemeral=True)
 
 
 ############### ON_READY & BOT START ###############
