@@ -877,7 +877,7 @@ class MediaPagerView(discord.ui.View):
         self.page = page
 
         self.dropdown = discord.ui.Select(
-            placeholder="`✅` Select One",
+            placeholder="✅ Select One",
             min_values=1,
             max_values=1,
             options=[]
