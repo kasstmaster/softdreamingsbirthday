@@ -146,7 +146,7 @@ async def log_to_thread(content: str):
 
 async def log_exception(tag: str, exc: Exception):
     tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    text = f"{tag}: {exc}\n{tb}"
+    text = f"@everyone {tag}: {exc}\n{tb}"
     if len(text) > 1900:
         text = text[:1900]
     await log_to_thread(text)
@@ -345,6 +345,7 @@ async def initialize_storage_message():
     global storage_message_id, pool_storage_message_id
     channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID)
     if not channel:
+        await log_to_thread(f"Birthday storage channel not found for BIRTHDAY_STORAGE_CHANNEL_ID={BIRTHDAY_STORAGE_CHANNEL_ID}.")
         return
     birthday_msg = None
     pool_msg = None
@@ -358,12 +359,22 @@ async def initialize_storage_message():
             birthday_msg = msg
         if birthday_msg and pool_msg:
             break
+    created_birthday = False
+    created_pool = False
     if birthday_msg is None:
         birthday_msg = await channel.send("{}")
+        created_birthday = True
     if pool_msg is None:
         pool_msg = await channel.send("POOL_DATA: {}")
+        created_pool = True
     storage_message_id = birthday_msg.id
     pool_storage_message_id = pool_msg.id
+    if created_birthday:
+        await log_to_thread(f"Initialized birthday storage message id={storage_message_id} in channel {BIRTHDAY_STORAGE_CHANNEL_ID}.")
+    if created_pool:
+        await log_to_thread(f"Initialized pool storage message id={pool_storage_message_id} in channel {BIRTHDAY_STORAGE_CHANNEL_ID}.")
+    if not created_birthday and not created_pool:
+        await log_to_thread(f"Reused existing birthday storage id={storage_message_id} and pool storage id={pool_storage_message_id} in channel {BIRTHDAY_STORAGE_CHANNEL_ID}.")
 
 async def _load_storage_message() -> dict:
     global storage_message_id
@@ -374,7 +385,8 @@ async def _load_storage_message() -> dict:
         msg = await channel.fetch_message(storage_message_id)
         data = json.loads(msg.content.strip() or "{}")
         return data if isinstance(data, dict) else {}
-    except:
+    except Exception as e:
+        await log_exception("_load_storage_message", e)
         return {}
 
 async def _save_storage_message(data: dict):
@@ -388,8 +400,8 @@ async def _save_storage_message(data: dict):
         if len(text) > 1900:
             text = text[:1900]
         await msg.edit(content=text)
-    except:
-        pass
+    except Exception as e:
+        await log_exception("_save_storage_message", e)
 
 async def _load_pool_message() -> dict:
     global pool_storage_message_id
@@ -403,7 +415,8 @@ async def _load_pool_message() -> dict:
             content = content[len("POOL_DATA:"):].strip()
         data = json.loads(content or "{}")
         return data if isinstance(data, dict) else {}
-    except:
+    except Exception as e:
+        await log_exception("_load_pool_message", e)
         return {}
 
 async def _save_pool_message(data: dict):
@@ -417,9 +430,8 @@ async def _save_pool_message(data: dict):
         if len(text) > 1900:
             text = text[:1900]
         await msg.edit(content=text)
-    except:
-        pass
-
+    except Exception as e:
+        await log_exception("_save_pool_message", e)
 async def load_request_pool():
     global request_pool, pool_message_locations
     raw = await _load_pool_message()
@@ -458,6 +470,7 @@ async def load_request_pool():
             except:
                 continue
             pool_message_locations[gid] = (ch_id, msg_id)
+    await log_to_thread(f"load_request_pool: loaded pools for {len(request_pool)} guild(s); message locations for {len(pool_message_locations)} guild(s).")
 
 async def save_request_pool():
     raw = {}
@@ -477,22 +490,27 @@ async def initialize_media_lists():
     global movie_titles
     if gc is None or not SHEET_ID:
         movie_titles = []
+        await log_to_thread("initialize_media_lists: QOTD media disabled; missing Google credentials or sheet id.")
         return
-    sh = gc.open_by_key(SHEET_ID)
-    ws = sh.worksheet("Movies")
-    vals = ws.get_all_values()[1:]
-    movies = []
-    for row in vals:
-        if not row:
-            continue
-        title = row[0].strip() if len(row) > 0 else ""
-        if not title:
-            continue
-        poster = row[1].strip() if len(row) > 1 else ""
-        trailer = row[2].strip() if len(row) > 2 else ""
-        movies.append({"title": title, "poster": poster, "trailer": trailer})
-    movie_titles = movies
-    print(f"Loaded {len(movie_titles)} movies from sheet.")
+    try:
+        sh = gc.open_by_key(SHEET_ID)
+        ws = sh.worksheet("Movies")
+        vals = ws.get_all_values()[1:]
+        movies = []
+        for row in vals:
+            if not row:
+                continue
+            title = row[0].strip() if len(row) > 0 else ""
+            if not title:
+                continue
+            poster = row[1].strip() if len(row) > 1 else ""
+            trailer = row[2].strip() if len(row) > 2 else ""
+            movies.append({"title": title, "poster": poster, "trailer": trailer})
+        movie_titles = movies
+        await log_to_thread(f"initialize_media_lists: loaded {len(movie_titles)} movies from sheet.")
+    except Exception as e:
+        movie_titles = []
+        await log_exception("initialize_media_lists", e)
 
 async def sync_movie_library_messages():
     if MOVIE_STORAGE_CHANNEL_ID == 0:
@@ -505,6 +523,9 @@ async def sync_movie_library_messages():
         if msg.author == bot.user:
             existing.append(msg)
     rows = movie_titles
+    edited = 0
+    created = 0
+    deleted = 0
     for idx, movie in enumerate(rows):
         title = movie["title"]
         trailer = movie.get("trailer") or ""
@@ -513,21 +534,26 @@ async def sync_movie_library_messages():
             m = existing[idx]
             try:
                 await m.edit(content=content, view=MovieEntryView())
-            except:
+                edited += 1
+            except Exception as e:
                 try:
                     await channel.send(content=content, view=MovieEntryView())
-                except:
-                    pass
+                    created += 1
+                except Exception as e2:
+                    await log_exception("sync_movie_library_messages_send", e2)
         else:
             try:
                 await channel.send(content=content, view=MovieEntryView())
-            except:
-                pass
+                created += 1
+            except Exception as e:
+                await log_exception("sync_movie_library_messages_send", e)
     for extra in existing[len(rows):]:
         try:
             await extra.delete()
-        except:
-            pass
+            deleted += 1
+        except Exception as e:
+            await log_exception("sync_movie_library_messages_delete", e)
+    await log_to_thread(f"sync_movie_library_messages: edited={edited}, created={created}, deleted={deleted} in channel {MOVIE_STORAGE_CHANNEL_ID}.")
 
 async def set_birthday(guild_id: int, user_id: int, mm_dd: str):
     data = await _load_storage_message()
@@ -661,18 +687,21 @@ async def get_qotd_sheet_and_tab():
     except gspread.WorksheetNotFound:
         ws = sh.sheet1
         tab = ws.title
-        print(f"QOTD: worksheet '{tab}' not found, using first sheet.")
+        await log_to_thread(f"QOTD: worksheet '{tab}' not found, using first sheet.")
     return ws, tab
 
 async def post_daily_qotd():
     if gc is None or not SHEET_ID or QOTD_CHANNEL_ID == 0:
+        await log_to_thread("QOTD: post_daily_qotd skipped; configuration incomplete.")
         return
     channel = bot.get_channel(QOTD_CHANNEL_ID)
     if not channel:
+        await log_to_thread("QOTD: post_daily_qotd skipped; QOTD channel not found.")
         return
     worksheet, season = await get_qotd_sheet_and_tab()
     all_vals = worksheet.get_all_values()
     if len(all_vals) < 2:
+        await log_to_thread("QOTD: Sheet has no questions (rows < 2).")
         return
     questions = all_vals[1:]
     unused = []
@@ -690,6 +719,7 @@ async def post_daily_qotd():
     chosen += [""] * (2 - len(chosen))
     question = chosen[1].strip() or chosen[0].strip()
     if not question:
+        await log_to_thread("QOTD: Selected row had no question text; skipping.")
         return
     colors = {"Regular": 0x9b59b6, "Fall Season": 0xe67e22, "Christmas": 0x00ff00}
     embed = discord.Embed(title="Question of the Day", description=question, color=colors.get(season, 0x9b59b6))
@@ -772,8 +802,8 @@ async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
                 data = await resp.read()
         await bot.user.edit(avatar=data)
         await guild.edit(icon=data)
-    except:
-        pass
+    except Exception as e:
+        await log_exception("apply_icon_to_bot_and_server", e)
 
 def _load_emoji_config_from_env(env_name: str) -> list[dict]:
     raw = os.getenv(env_name, "[]")
@@ -803,37 +833,37 @@ async def apply_theme_emojis(guild: discord.Guild, theme: str) -> int:
     env_name = "THEME_CHRISTMAS_EMOJIS" if theme == "christmas" else "THEME_HALLOWEEN_EMOJIS"
     config = _load_emoji_config_from_env(env_name)
     if not config:
-        print(f"{env_name} is empty or invalid")
+        await log_to_thread(f"{env_name} is empty or invalid for guild {guild.id}.")
         return 0
     created = 0
     existing_names = {e.name for e in guild.emojis}
     if hasattr(guild, "emoji_limit") and len(existing_names) >= guild.emoji_limit:
-        print(f"{env_name}: emoji limit reached ({len(existing_names)}/{guild.emoji_limit}), skipping creation")
+        await log_to_thread(f"{env_name}: emoji limit reached ({len(existing_names)}/{guild.emoji_limit}) in guild {guild.id}, skipping creation.")
         return 0
     async with aiohttp.ClientSession() as session:
         for item in config:
             if not isinstance(item, dict):
-                print(f"{env_name} bad item (not dict): {item!r}")
+                await log_to_thread(f"{env_name} bad item (not dict) in guild {guild.id}: {item!r}")
                 continue
             name = item.get("name")
             url = item.get("url")
             if not isinstance(name, str) or not isinstance(url, str):
-                print(f"{env_name} bad types: name={type(name).__name__}, url={type(url).__name__}")
+                await log_to_thread(f"{env_name} bad types in guild {guild.id}: name={type(name).__name__}, url={type(url).__name__}")
                 continue
             if not name or not url:
-                print(f"{env_name} missing name or url: {item!r}")
+                await log_to_thread(f"{env_name} missing name or url in guild {guild.id}: {item!r}")
                 continue
             if name in existing_names:
-                print(f"Emoji {name} already exists, skipping")
+                await log_to_thread(f"{env_name}: emoji {name} already exists in guild {guild.id}, skipping.")
                 continue
             try:
                 async with session.get(url) as resp:
-                    print(f"FETCH {name} {url} -> {resp.status}")
+                    await log_to_thread(f"{env_name} FETCH {name} {url} -> {resp.status} in guild {guild.id}.")
                     if resp.status != 200:
                         continue
                     data = await resp.read()
                 emoji = await guild.create_custom_emoji(name=name, image=data, reason=f"{theme} emoji")
-                print(f"EMOJI_CREATED {emoji.name} size={len(data)}")
+                await log_to_thread(f"{env_name} EMOJI_CREATED {emoji.name} size={len(data)} in guild {guild.id}.")
                 existing_names.add(emoji.name)
                 created += 1
             except Exception as e:
@@ -1112,6 +1142,7 @@ async def birthday_checker():
                 try:
                     role = guild.get_role(BIRTHDAY_ROLE_ID)
                     if not role:
+                        await log_to_thread(f"birthday_checker guild={guild.id} today={today} skipped; birthday role not found.")
                         continue
                     bdays = await get_guild_birthdays(guild.id)
                     for member in guild.members:
@@ -1132,10 +1163,10 @@ async def birthday_checker():
 @bot.event
 async def on_ready():
     global startup_logging_done, startup_log_buffer
-    print(f"{bot.user} is online!")
 
     startup_logging_done = False
     startup_log_buffer = []
+    startup_log_buffer.append(f"{bot.user} is online!")
 
     await initialize_storage_message()
     await initialize_media_lists()
@@ -1155,7 +1186,7 @@ async def on_ready():
 
     channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID != 0 else None
     if channel:
-        big_text = "---------------------------- STARTUP LOGS ----------------------------\n\n" + "\n".join(startup_log_buffer)
+        big_text = "@everyone ---------------------------- STARTUP LOGS ----------------------------\n\n" + "\n".join(startup_log_buffer)
         if len(big_text) > 1900:
             big_text = big_text[:1900]
         try:
@@ -1199,7 +1230,7 @@ async def on_application_command_error(ctx, error):
 async def on_error(event, *args, **kwargs):
     exc_type, exc, tb = sys.exc_info()
     if exc is None:
-        await log_to_thread(f"Unhandled error in event {event} with no exception info.")
+        await log_to_thread(f"@everyone Unhandled error in event {event} with no exception info.")
     else:
         await log_exception(f"Unhandled error in event {event}", exc)
 
@@ -1281,6 +1312,7 @@ async def remove_for(ctx, member: discord.Member):
 @bot.slash_command(name="birthdays", description="View everyones birthdays")
 async def birthdays_cmd(ctx):
     await ctx.respond(embed=await build_birthday_embed(ctx.guild), ephemeral=True)
+    await log_to_thread(f"/birthdays used by {ctx.author} ({ctx.author.id}) in guild {ctx.guild.id}.")
 
 @bot.slash_command(name="birthdays_public", description="Create or update the public birthday list message")
 async def birthdays_public(ctx):
@@ -1427,6 +1459,7 @@ async def pick_replace(
 async def pool(ctx):
     embed = await build_pool_embed(ctx.guild)
     await ctx.respond(embed=embed, ephemeral=True)
+    await log_to_thread(f"/pool used by {ctx.author} ({ctx.author.id}) in guild {ctx.guild.id}.")
 
 @bot.slash_command(name="random", description="Pick tonight's winner — unpicked movies roll over to tomorrow!")
 async def random_pick(ctx):
