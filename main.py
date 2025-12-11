@@ -1142,6 +1142,7 @@ async def birthday_checker():
 async def on_ready():
     global startup_logging_done, startup_log_buffer
     print(f"{bot.user} is online!")
+
     channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID != 0 else None
     if channel and startup_log_buffer:
         big_text = "---------------------------- STARTUP LOGS ----------------------------\n" + "\n".join(startup_log_buffer)
@@ -1151,8 +1152,18 @@ async def on_ready():
             await channel.send(big_text)
         except Exception:
             pass
+
     startup_logging_done = True
     startup_log_buffer = []
+
+    await initialize_storage_message()
+    await initialize_media_lists()
+    await load_request_pool()
+    bot.loop.create_task(qotd_scheduler())
+    bot.loop.create_task(theme_scheduler())
+    bot.loop.create_task(birthday_checker())
+    await run_startup_checks()
+    await log_to_thread(f"on_ready complete for {bot.user} in {len(bot.guilds)} guild(s).")
 
 @bot.event
 async def on_member_join(member):
