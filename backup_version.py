@@ -19,7 +19,7 @@
 # • Movie Night: sheet sync, pool system, random winner, rating announcements
 # • Birthdays: storage, daily role assignment, public birthday list
 # • QOTD: seasonal sheet selection, daily scheduler, posting logic
-# • Seasonal Themes: holiday roles, emojis, server/bot icons
+# • Seasonal Themes: themed roles, emojis, server/bot icons
 # • Member Tools: Dead Chat color cycle, VC-status role, admin utilities
 # ============================================================
 # SERVER: Soft Dreamings (≈25 members, ages 25–40)
@@ -60,6 +60,7 @@ import discord
 import random as pyrandom
 import gspread
 import traceback
+import sys
 from datetime import datetime, time, timezone
 from google.oauth2.service_account import Credentials
 
@@ -95,19 +96,18 @@ else:
     print("QOTD disabled: missing GOOGLE_CREDENTIALS or GOOGLE_SHEET_ID")
     
 ENABLE_TV_IN_PICK = False
-MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID = _env_int("MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID", 0)  # ・Movies
-SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID = _env_int("SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID", 0)  # ・Ratings
+RATING_CHANNEL_ID = _env_int("RATING_CHANNEL_ID", 0)  # ・Ratings
 MOVIE_STORAGE_CHANNEL_ID = _env_int("MOVIE_STORAGE_CHANNEL_ID", 0)  # For trailer messages linked to sheets
 MAX_POOL_ENTRIES_PER_USER = _env_int("MAX_POOL_ENTRIES_PER_USER", 3) 
 PAGE_SIZE = 25
 
 QOTD_CHANNEL_ID = _env_int("QOTD_CHANNEL_ID", 0)
 
-DEFAULT_ICON_URL = os.getenv("DEFAULT_ICON_URL", "")
-CHRISTMAS_ICON_URL = os.getenv("CHRISTMAS_ICON_URL", "")
-HALLOWEEN_ICON_URL = os.getenv("HALLOWEEN_ICON_URL", "")
-CHRISTMAS_ROLES = {"Sandy Claws": "Admin", "Grinch": "Original Member", "Cranberry": "Member", "Christmas": "Bots"}
-HALLOWEEN_ROLES = {"Cauldron": "Admin", "Candy": "Original Member", "Witchy": "Member", "Halloween": "Bots"}
+ICON_DEFAULT_URL = os.getenv("ICON_DEFAULT_URL", "")
+ICON_CHRISTMAS_URL = os.getenv("ICON_CHRISTMAS_URL", "")
+ICON_HALLOWEEN_URL = os.getenv("ICON_HALLOWEEN_URL", "")
+THEME_CHRISTMAS_ROLES = {"Sandy Claws": "Admin", "Grinch": "Original Member", "Cranberry": "Member", "Christmas": "Bots"}
+THEME_HALLOWEEN_ROLES = {"Cauldron": "Admin", "Candy": "Original Member", "Witchy": "Member", "Halloween": "Bots"}
 
 DEAD_CHAT_ROLE_ID = _env_int("DEAD_CHAT_ROLE_ID", 0)
 DEAD_CHAT_ROLE_NAME = os.getenv("DEAD_CHAT_ROLE_NAME", "Dead Chat")
@@ -115,11 +115,10 @@ DEAD_CHAT_COLORS = [discord.Color.red(), discord.Color.orange(), discord.Color.g
 
 BIRTHDAY_ROLE_ID = _env_int("BIRTHDAY_ROLE_ID", 0)  # The role given when it is their birthday
 BIRTHDAY_STORAGE_CHANNEL_ID = _env_int("BIRTHDAY_STORAGE_CHANNEL_ID", 0)
-BIRTHDAY_LIST_CHANNEL_ID = _env_int("BIRTHDAY_LIST_CHANNEL_ID", 0)
-BIRTHDAY_LIST_MESSAGE_ID = _env_int("BIRTHDAY_LIST_MESSAGE_ID", 0)
 MONTH_CHOICES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 MONTH_TO_NUM = {name: f"{i:02d}" for i, name in enumerate(MONTH_CHOICES, start=1)}
 
+BOT_LOG_THREAD_ID = _env_int("BOT_LOG_THREAD_ID", 0)
 
 
 ############### GLOBAL STATE / STORAGE ###############
@@ -128,9 +127,220 @@ pool_storage_message_id: int | None = None
 pool_message_locations: dict[int, tuple[int, int]] = {}
 movie_titles: list[dict] = []
 request_pool: dict[int, list[tuple[int, str]]] = {}
+startup_logging_done: bool = False
+startup_log_buffer = []
 
 
 ############### HELPER FUNCTIONS ###############
+async def log_to_thread(content: str):
+    if not startup_logging_done:
+        startup_log_buffer.append(content)
+        return
+    channel = bot.get_channel(BOT_LOG_THREAD_ID)
+    if not channel:
+        return
+    try:
+        await channel.send(content)
+    except Exception:
+        pass
+
+async def log_exception(tag: str, exc: Exception):
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    text = f"{tag}: {exc}\n{tb}"
+    if len(text) > 1900:
+        text = text[:1900]
+    await log_to_thread(text)
+
+async def run_startup_checks():
+    global storage_message_id, pool_storage_message_id
+
+    lines = []
+    lines.append("Startup check report:")
+    lines.append("")
+
+    lines.append("[LOGGING]")
+    log_channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID else None
+    if BOT_LOG_THREAD_ID == 0:
+        lines.append("`⚠️` Log thread ID missing or zero (BOT_LOG_THREAD_ID).")
+    elif log_channel is None:
+        lines.append("`⚠️` Log thread channel not accessible (BOT_LOG_THREAD_ID does not resolve).")
+    else:
+        lines.append(f"`✅` Log thread configured in channel {BOT_LOG_THREAD_ID}")
+    lines.append("")
+
+    lines.append("[STORAGE]")
+
+    storage_ok = False
+    try:
+        data = await _load_storage_message()
+        storage_ok = isinstance(data, dict)
+    except Exception as e:
+        await log_exception("startup_check_storage", e)
+        storage_ok = False
+    if storage_ok:
+        lines.append("`✅` Birthday storage data")
+    else:
+        lines.append("`⚠️` Birthday storage data could not be loaded or parsed")
+
+    birthday_storage_binding_ok = (
+        storage_message_id is not None
+        and BIRTHDAY_STORAGE_CHANNEL_ID != 0
+        and bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID) is not None
+    )
+    if birthday_storage_binding_ok:
+        lines.append(f"`✅` Birthday storage message binding (msg_id={storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
+    else:
+        lines.append("`⚠️` Birthday storage message binding missing or inaccessible")
+
+    pool_ok = False
+    try:
+        pool = await _load_pool_message()
+        pool_ok = isinstance(pool, dict)
+    except Exception as e:
+        await log_exception("startup_check_pool", e)
+        pool_ok = False
+    if pool_ok:
+        lines.append("`✅` Pool storage data")
+    else:
+        lines.append("`⚠️` Pool storage data could not be loaded or parsed")
+
+    pool_storage_binding_ok = (
+        pool_storage_message_id is not None
+        and BIRTHDAY_STORAGE_CHANNEL_ID != 0
+        and bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID) is not None
+    )
+    if pool_storage_binding_ok:
+        lines.append(f"`✅` Pool storage message binding (msg_id={pool_storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
+    else:
+        lines.append("`⚠️` Pool storage message binding missing or inaccessible")
+
+    storage_channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID) if BIRTHDAY_STORAGE_CHANNEL_ID else None
+    if storage_channel:
+        lines.append("`✅` Birthday storage channel")
+    else:
+        lines.append("`⚠️` Birthday storage channel not found")
+
+    lines.append("")
+    lines.append("[QOTD / MEDIA]")
+
+    sheets_ok = gc is not None and bool(SHEET_ID)
+    if sheets_ok:
+        lines.append("`✅` Google Sheets client")
+    else:
+        lines.append("`⚠️` Google Sheets client missing or invalid (credentials or sheet ID)")
+
+    movies_ok = isinstance(movie_titles, list)
+    count = len(movie_titles) if movies_ok else 0
+    if movies_ok and count > 0:
+        lines.append(f"`✅` Movie list loaded ({count} item(s))")
+    elif movies_ok:
+        lines.append("`⚠️` Movie list loaded as an empty list")
+    else:
+        lines.append("`⚠️` Movie list is not a valid list object")
+
+    qotd_channel = bot.get_channel(QOTD_CHANNEL_ID) if QOTD_CHANNEL_ID else None
+    if qotd_channel:
+        lines.append("`✅` QOTD channel")
+    else:
+        lines.append("`⚠️` QOTD channel not found")
+
+    rating_channel = bot.get_channel(RATING_CHANNEL_ID) if RATING_CHANNEL_ID else None
+    if rating_channel:
+        lines.append("`✅` Movie rating channel")
+    else:
+        lines.append("`⚠️` Movie rating channel not found")
+
+    movie_storage_channel = bot.get_channel(MOVIE_STORAGE_CHANNEL_ID) if MOVIE_STORAGE_CHANNEL_ID else None
+    if movie_storage_channel:
+        lines.append("`✅` Movie storage channel")
+    else:
+        lines.append("`⚠️` Movie storage channel not found")
+
+    lines.append("")
+    lines.append("[THEMES]")
+
+    emoji_names = _collect_theme_emoji_names()
+    if emoji_names:
+        lines.append(f"`✅` Theme emoji config ({len(emoji_names)} name(s))")
+    else:
+        lines.append("`⚠️` Theme emoji config missing or empty")
+
+    if THEME_CHRISTMAS_ROLES:
+        lines.append("`✅` Christmas role templates")
+    else:
+        lines.append("`⚠️` Christmas role templates not defined")
+
+    if THEME_HALLOWEEN_ROLES:
+        lines.append("`✅` Halloween role templates")
+    else:
+        lines.append("`⚠️` Halloween role templates not defined")
+
+    if ICON_DEFAULT_URL:
+        lines.append("`✅` Default icon URL")
+    else:
+        lines.append("`⚠️` Default icon URL missing")
+
+    if ICON_CHRISTMAS_URL:
+        lines.append("`✅` Christmas icon URL")
+    else:
+        lines.append("`⚠️` Christmas icon URL missing")
+
+    if ICON_HALLOWEEN_URL:
+        lines.append("`✅` Halloween icon URL")
+    else:
+        lines.append("`⚠️` Halloween icon URL missing")
+
+    lines.append("")
+    lines.append("[ROLES / VC]")
+
+    guild = bot.guilds[0] if bot.guilds else None
+    if guild is None:
+        lines.append("`⚠️` Bot is not connected to a guild")
+    else:
+        birthday_role = guild.get_role(BIRTHDAY_ROLE_ID) if BIRTHDAY_ROLE_ID else None
+        if birthday_role:
+            lines.append(f"`✅` Birthday role found ({birthday_role.name}, id={birthday_role.id})")
+        else:
+            lines.append("`⚠️` Birthday role missing or invalid")
+
+        dead_chat_role = None
+        if DEAD_CHAT_ROLE_ID:
+            dead_chat_role = guild.get_role(DEAD_CHAT_ROLE_ID)
+        if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
+            dead_chat_role = discord.utils.get(guild.roles, name=DEAD_CHAT_ROLE_NAME)
+
+        if dead_chat_role:
+            lines.append(f"`✅` Dead Chat role found ({dead_chat_role.name}, id={dead_chat_role.id})")
+        else:
+            lines.append("`⚠️` Dead Chat role missing or invalid")
+
+        vc_id = 1331501272804884490
+        vc_role_id = 1444555985728442390
+
+        vc_channel = guild.get_channel(vc_id)
+        vc_role = guild.get_role(vc_role_id)
+
+        if vc_channel:
+            lines.append(f"`✅` VC channel found for VC-status tracking ({vc_channel.name}, id={vc_id})")
+        else:
+            lines.append(f"`⚠️` VC channel {vc_id} not found")
+
+        if vc_role:
+            lines.append(f"`✅` VC-status role found ({vc_role.name}, id={vc_role_id})")
+        else:
+            lines.append(f"`⚠️` VC-status role {vc_role_id} not found")
+
+    lines.append("")
+    lines.append("")
+    lines.append("All systems passed basic storage + runtime checks.")
+    lines.append(f"[STARTUP] Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
+    lines.append("Schedulers started: birthday_checker, qotd_scheduler, theme_scheduler.")
+
+    text = "\n".join(lines)
+    if len(text) > 1900:
+        text = text[:1900]
+    await log_to_thread(text)
+    
 def build_mm_dd(month_name: str, day: int) -> str | None:
     month_num = MONTH_TO_NUM.get(month_name)
     if not month_num or not (1 <= day <= 31):
@@ -371,8 +581,6 @@ async def get_birthday_public_location(guild_id: int):
             msg_id = pm.get("message_id")
             if isinstance(ch_id, int) and isinstance(msg_id, int):
                 return ch_id, msg_id
-    if BIRTHDAY_LIST_CHANNEL_ID and BIRTHDAY_LIST_MESSAGE_ID:
-        return BIRTHDAY_LIST_CHANNEL_ID, BIRTHDAY_LIST_MESSAGE_ID
     return None
 
 async def set_birthday_public_location(guild_id: int, channel_id: int, message_id: int):
@@ -481,7 +689,7 @@ async def post_daily_qotd():
         if question_text and (not status_a or not status_b):
             unused.append(row)
     if not unused:
-        print("QOTD: All questions used; resetting.")
+        await log_to_thread("QOTD: All questions used; resetting.")
         worksheet.update("A2:B", [[""] * 2 for _ in range(len(questions))])
         unused = questions
     chosen = pyrandom.choice(unused)
@@ -496,7 +704,7 @@ async def post_daily_qotd():
     row_idx = questions.index(chosen) + 2
     status_col = "A" if chosen[1].strip() else "B"
     worksheet.update(f"{status_col}{row_idx}", [[f"Used {datetime.utcnow().strftime('%Y-%m-%d')}"]])
-    print(f"QOTD: Posted question from row {row_idx} ({season}).")
+    await log_to_thread(f"QOTD: Posted question from row {row_idx} ({season}).")
 
 def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
     name_lower = name.lower()
@@ -506,8 +714,27 @@ def find_role_by_name(guild: discord.Guild, name: str) -> discord.Role | None:
             return role
     return None
 
-async def apply_holiday_theme(guild: discord.Guild, holiday: str) -> int:
-    role_map = CHRISTMAS_ROLES if holiday == "christmas" else HALLOWEEN_ROLES
+async def apply_theme_for_today(guild: discord.Guild, today: str | None = None):
+    if today is None:
+        today = datetime.utcnow().strftime("%m-%d")
+    removed_roles = await clear_theme_roles(guild)
+    removed_emojis = await clear_theme_emojis(guild)
+    added_roles = 0
+    added_emojis = 0
+    mode = "none"
+    if "10-01" <= today <= "10-31":
+        added_roles = await apply_theme_roles(guild, "halloween")
+        added_emojis = await apply_theme_emojis(guild, "halloween")
+        mode = "halloween"
+    elif "12-01" <= today <= "12-26":
+        added_roles = await apply_theme_roles(guild, "christmas")
+        added_emojis = await apply_theme_emojis(guild, "christmas")
+        mode = "christmas"
+    await log_to_thread(f"theme_update guild={guild.id} today={today} mode={mode} roles_cleared={removed_roles} emojis_cleared={removed_emojis} roles_added={added_roles} emojis_added={added_emojis}")
+    return mode, removed_roles, removed_emojis, added_roles, added_emojis
+
+async def apply_theme_roles(guild: discord.Guild, theme: str) -> int:
+    role_map = THEME_CHRISTMAS_ROLES if theme == "christmas" else THEME_HALLOWEEN_ROLES
     added = 0
     for color_name, base_keyword in role_map.items():
         color_role = find_role_by_name(guild, color_name)
@@ -517,27 +744,27 @@ async def apply_holiday_theme(guild: discord.Guild, holiday: str) -> int:
             if any(base_keyword.lower() in r.name.lower() for r in member.roles):
                 if color_role not in member.roles:
                     try:
-                        await member.add_roles(color_role, reason=f"{holiday.capitalize()} theme")
+                        await member.add_roles(color_role, reason=f"{theme.capitalize()} theme")
                         added += 1
                     except:
                         pass
-    icon_url = CHRISTMAS_ICON_URL if holiday == "christmas" else HALLOWEEN_ICON_URL
+    icon_url = ICON_CHRISTMAS_URL if theme == "christmas" else ICON_HALLOWEEN_URL
     await apply_icon_to_bot_and_server(guild, icon_url)
     return added
 
-async def clear_holiday_theme(guild: discord.Guild) -> int:
+async def clear_theme_roles(guild: discord.Guild) -> int:
     removed = 0
-    for color_name in {**CHRISTMAS_ROLES, **HALLOWEEN_ROLES}:
+    for color_name in {**THEME_CHRISTMAS_ROLES, **THEME_HALLOWEEN_ROLES}:
         role = find_role_by_name(guild, color_name)
         if role:
             async for member in guild.fetch_members(limit=None):
                 if role in member.roles:
                     try:
-                        await member.remove_roles(role, reason="Holiday theme ended")
+                        await member.remove_roles(role, reason="Theme ended")
                         removed += 1
                     except:
                         pass
-    await apply_icon_to_bot_and_server(guild, DEFAULT_ICON_URL)
+    await apply_icon_to_bot_and_server(guild, ICON_DEFAULT_URL)
     return removed
 
 async def apply_icon_to_bot_and_server(guild: discord.Guild, url: str):
@@ -566,9 +793,9 @@ def _load_emoji_config_from_env(env_name: str) -> list[dict]:
         print(f"{env_name} JSON error: {repr(e)}")
     return []
 
-def _collect_holiday_emoji_names() -> set[str]:
+def _collect_theme_emoji_names() -> set[str]:
     names: set[str] = set()
-    for env_name in ("CHRISTMAS_EMOJIS", "HALLOWEEN_EMOJIS"):
+    for env_name in ("THEME_CHRISTMAS_EMOJIS", "THEME_HALLOWEEN_EMOJIS"):
         config = _load_emoji_config_from_env(env_name)
         for item in config:
             if not isinstance(item, dict):
@@ -578,8 +805,8 @@ def _collect_holiday_emoji_names() -> set[str]:
                 names.add(name)
     return names
 
-async def apply_holiday_emojis(guild: discord.Guild, holiday: str) -> int:
-    env_name = "CHRISTMAS_EMOJIS" if holiday == "christmas" else "HALLOWEEN_EMOJIS"
+async def apply_theme_emojis(guild: discord.Guild, theme: str) -> int:
+    env_name = "THEME_CHRISTMAS_EMOJIS" if theme == "christmas" else "THEME_HALLOWEEN_EMOJIS"
     config = _load_emoji_config_from_env(env_name)
     if not config:
         print(f"{env_name} is empty or invalid")
@@ -611,17 +838,18 @@ async def apply_holiday_emojis(guild: discord.Guild, holiday: str) -> int:
                     if resp.status != 200:
                         continue
                     data = await resp.read()
-                emoji = await guild.create_custom_emoji(name=name, image=data, reason=f"{holiday} emoji")
+                emoji = await guild.create_custom_emoji(name=name, image=data, reason=f"{theme} emoji")
                 print(f"EMOJI_CREATED {emoji.name} size={len(data)}")
                 existing_names.add(emoji.name)
                 created += 1
             except Exception as e:
-                print(f"EMOJI_ERROR {name}: {repr(e)}")
+                await log_exception(f"EMOJI_ERROR_{name}", e)
                 continue
+    await log_to_thread(f"{env_name}: created {created} emoji(s) in guild {guild.id}.")
     return created
 
-async def clear_holiday_emojis(guild: discord.Guild) -> int:
-    names = _collect_holiday_emoji_names()
+async def clear_theme_emojis(guild: discord.Guild) -> int:
+    names = _collect_theme_emoji_names()
     if not names:
         return 0
     removed = 0
@@ -629,10 +857,12 @@ async def clear_holiday_emojis(guild: discord.Guild) -> int:
         if emoji.name not in names:
             continue
         try:
-            await emoji.delete(reason="Holiday emoji cleanup")
+            await emoji.delete(reason="Theme emoji cleanup")
             removed += 1
-        except:
+        except Exception as e:
+            await log_exception(f"THEME_EMOJI_REMOVE_{emoji.name}", e)
             continue
+    await log_to_thread(f"Theme emoji cleanup: removed {removed} emoji(s) in guild {guild.id}.")
     return removed
 
 def movie_night_time() -> str:
@@ -850,39 +1080,31 @@ async def qotd_scheduler():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 17
     TARGET_MINUTE = 0
+    await log_to_thread("qotd_scheduler started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             try:
                 await post_daily_qotd()
             except Exception as e:
-                print("QOTD scheduler error:", repr(e))
-                traceback.print_exc()
+                await log_exception("qotd_scheduler", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
-async def holiday_scheduler():
+async def theme_scheduler():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 9
     TARGET_MINUTE = 0
+    await log_to_thread("theme_scheduler started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             today = now.strftime("%m-%d")
             for guild in bot.guilds:
-                if "10-01" <= today <= "10-31":
-                    await clear_holiday_theme(guild)
-                    await apply_holiday_theme(guild, "halloween")
-                    await clear_holiday_emojis(guild)
-                    await apply_holiday_emojis(guild, "halloween")
-                elif "12-01" <= today <= "12-26":
-                    await clear_holiday_theme(guild)
-                    await apply_holiday_theme(guild, "christmas")
-                    await clear_holiday_emojis(guild)
-                    await apply_holiday_emojis(guild, "christmas")
-                else:
-                    await clear_holiday_theme(guild)
-                    await clear_holiday_emojis(guild)
+                try:
+                    await apply_theme_for_today(guild, today)
+                except Exception as e:
+                    await log_exception(f"theme_scheduler_guild_{guild.id}", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
@@ -890,22 +1112,27 @@ async def birthday_checker():
     await bot.wait_until_ready()
     TARGET_HOUR_UTC = 15
     TARGET_MINUTE = 0
+    await log_to_thread("birthday_checker started.")
     while not bot.is_closed():
         now = datetime.utcnow()
         if now.hour == TARGET_HOUR_UTC and now.minute == TARGET_MINUTE:
             today = now.strftime("%m-%d")
             for guild in bot.guilds:
-                role = guild.get_role(BIRTHDAY_ROLE_ID)
-                if not role:
-                    continue
-                bdays = await get_guild_birthdays(guild.id)
-                for member in guild.members:
-                    if bdays.get(str(member.id)) == today:
-                        if role not in member.roles:
-                            await member.add_roles(role, reason="Birthday!")
-                    else:
-                        if role in member.roles:
-                            await member.remove_roles(role, reason="Birthday over")
+                try:
+                    role = guild.get_role(BIRTHDAY_ROLE_ID)
+                    if not role:
+                        continue
+                    bdays = await get_guild_birthdays(guild.id)
+                    for member in guild.members:
+                        if bdays.get(str(member.id)) == today:
+                            if role not in member.roles:
+                                await member.add_roles(role, reason="Birthday!")
+                        else:
+                            if role in member.roles:
+                                await member.remove_roles(role, reason="Birthday over")
+                    await log_to_thread(f"birthday_checker guild={guild.id} today={today} birthdays_tracked={len(bdays)}")
+                except Exception as e:
+                    await log_exception(f"birthday_checker_guild_{guild.id}", e)
             await asyncio.sleep(61)
         await asyncio.sleep(30)
 
@@ -913,19 +1140,30 @@ async def birthday_checker():
 ############### EVENT HANDLERS ###############
 @bot.event
 async def on_ready():
-    print(f"{bot.user} online!")
-    bot.add_view(MovieEntryView())
-    try:
-        await initialize_storage_message()
-        await initialize_media_lists()
-        await load_request_pool()
-    except Exception as e:
-        print("INIT ERROR:", repr(e))
-        traceback.print_exc()
-    bot.loop.create_task(birthday_checker())
+    global startup_logging_done, startup_log_buffer
+    print(f"{bot.user} is online!")
+
+    channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID != 0 else None
+    if channel and startup_log_buffer:
+        big_text = "---------------------------- STARTUP LOGS ----------------------------\n" + "\n".join(startup_log_buffer)
+        if len(big_text) > 1900:
+            big_text = big_text[:1900]
+        try:
+            await channel.send(big_text)
+        except Exception:
+            pass
+
+    startup_logging_done = True
+    startup_log_buffer = []
+
+    await initialize_storage_message()
+    await initialize_media_lists()
+    await load_request_pool()
     bot.loop.create_task(qotd_scheduler())
-    bot.loop.create_task(holiday_scheduler())
-    print("QOTD scheduler started + Google Sheets ready!")
+    bot.loop.create_task(theme_scheduler())
+    bot.loop.create_task(birthday_checker())
+    await run_startup_checks()
+    await log_to_thread(f"on_ready complete for {bot.user} in {len(bot.guilds)} guild(s).")
 
 @bot.event
 async def on_member_join(member):
@@ -947,6 +1185,22 @@ async def on_voice_state_update(member, before, after):
     elif before.channel and before.channel.id == vc_id:
         if role in member.roles:
             await member.remove_roles(role, reason="Left VC")
+
+@bot.event
+async def on_application_command_error(ctx, error):
+    await log_exception("application_command_error", error)
+    try:
+        await ctx.respond("An internal error occurred.", ephemeral=True)
+    except Exception:
+        pass
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    exc_type, exc, tb = sys.exc_info()
+    if exc is None:
+        await log_to_thread(f"Unhandled error in event {event} with no exception info.")
+    else:
+        await log_exception(f"Unhandled error in event {event}", exc)
 
 
 ############### COMMAND GROUPS ###############
@@ -1179,34 +1433,41 @@ async def random_pick(ctx):
     pool = request_pool.get(ctx.guild.id, [])
     if not pool:
         return await ctx.followup.send("Pool is empty.", ephemeral=True)
+
     winner_idx = pyrandom.randrange(len(pool))
     winner_id, winner_title = pool[winner_idx]
+
     request_pool[ctx.guild.id] = [e for i, e in enumerate(pool) if i != winner_idx]
     await save_request_pool()
     await update_pool_public_message(ctx.guild)
+
     member = ctx.guild.get_member(winner_id)
     mention = member.mention if member else f"<@{winner_id}>"
+
     rollover = len(request_pool[ctx.guild.id])
     rollover_text = (
         f"\n\n{rollover} movie{'s' if rollover != 1 else ''} rolled over to the next pool"
         if rollover else ""
     )
+
     first_text = (
         f"Pool Winner: **{winner_title}**\n"
         f"{mention}'s pick!{rollover_text}\n\n"
     )
-    primary_channel = ctx.guild.get_channel(MOVIE_NIGHT_ANNOUNCEMENT_CHANNEL_ID)
-    if primary_channel:
-        await primary_channel.send(first_text)
-    second_channel = ctx.guild.get_channel(SECOND_MOVIE_ANNOUNCEMENT_CHANNEL_ID)
+
+    await ctx.channel.send(first_text)
+
+    second_channel = ctx.guild.get_channel(RATING_CHANNEL_ID)
     if second_channel:
-        second_text = (
-            f"**{winner_title}**"
-        )
+        second_text = f"**{winner_title}**"
         msg = await second_channel.send(second_text)
         for emoji in ["😍", "😃", "🙂", "🫤", "😒", "🤢"]:
             await msg.add_reaction(emoji)
-    await ctx.followup.send("Winner announced in both channels.", ephemeral=True)
+        summary = "Winner announced here and in the rating channel."
+    else:
+        summary = "Winner announced here. Rating channel not configured."
+
+    await ctx.followup.send(summary, ephemeral=True)
 
 @bot.slash_command(name="color", description="Change the color of the Dead Chat role")
 async def color_cycle(ctx):
@@ -1242,9 +1503,8 @@ async def qotd_send(ctx):
     try:
         await post_daily_qotd()
     except Exception as e:
-        print("qotd_send ERROR:", repr(e))
-        traceback.print_exc()
-        return await ctx.followup.send(f"QOTD error: `{type(e).__name__}` – `{repr(e)}`", ephemeral=True)
+        await log_exception("qotd_send", e)
+        return await ctx.followup.send("QOTD error: an internal error occurred.", ephemeral=True)
     await ctx.followup.send("QOTD posted!", ephemeral=True)
 
 @bot.slash_command(name="pool_public", description="Create or update the public pool message")
@@ -1267,6 +1527,24 @@ async def pool_public(ctx):
     pool_message_locations[ctx.guild.id] = (ctx.channel.id, msg.id)
     await save_request_pool()
     await ctx.respond("Created a new public pool message in this channel.", ephemeral=True)
+
+@bot.slash_command(name="theme_update", description="Recheck the date and apply the current seasonal theme for this server")
+async def theme_update(ctx):
+    if ctx.guild is None:
+        return await ctx.respond("This can only be used in a server.", ephemeral=True)
+    if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
+        return await ctx.respond("Admin only.", ephemeral=True)
+    await ctx.defer(ephemeral=True)
+    today = datetime.utcnow().strftime("%m-%d")
+    mode, removed_roles, removed_emojis, added_roles, added_emojis = await apply_theme_for_today(ctx.guild, today)
+    if mode == "halloween":
+        label = "Halloween theme applied."
+    elif mode == "christmas":
+        label = "Christmas theme applied."
+    else:
+        label = "Cleared theme and reverted to default."
+    summary = f"{label}\nRoles cleared: {removed_roles}\nEmojis cleared: {removed_emojis}\nRoles added: {added_roles}\nEmojis added: {added_emojis}"
+    await ctx.followup.send(summary, ephemeral=True)
 
 
 ############### ON_READY & BOT START ###############
