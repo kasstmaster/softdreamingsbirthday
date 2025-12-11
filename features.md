@@ -117,9 +117,6 @@ Daily Scheduling
 Automatically applies or clears themes based on the current date.
 
 # 7. Dead Chat Role Enhancements
-Color Cycling
-
-Allows Dead Chat role holders to cycle the role’s color through a preset sequence.
 
 Enforces that only role holders can use the command.
 
@@ -185,8 +182,6 @@ Holiday role themes and emoji sets
 Automatic holiday start/end detection
 
 Server and bot icon theming
-
-Dead Chat role color cycling
 
 DM onboarding message
 
