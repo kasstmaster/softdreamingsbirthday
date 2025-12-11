@@ -378,7 +378,12 @@ async def run_startup_checks():
     text = "\n".join(lines)
     if len(text) > 1900:
         text = text[:1900]
-    await log_to_thread(text)
+    channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID != 0 else None
+    header = "---------------------------- STARTUP LOGS ----------------------------\n"
+    if channel:
+        await channel.send(header + text)
+    else:
+        print(header + text)
     
 def build_mm_dd(month_name: str, day: int) -> str | None:
     month_num = MONTH_TO_NUM.get(month_name)
