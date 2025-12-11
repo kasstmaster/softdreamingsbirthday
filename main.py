@@ -1503,25 +1503,6 @@ async def random_pick(ctx):
 
     await ctx.followup.send(summary, ephemeral=True)
 
-@bot.slash_command(name="color", description="Change the color of the Dead Chat role")
-async def color_cycle(ctx):
-    dead_chat_role = ctx.guild.get_role(DEAD_CHAT_ROLE_ID) if DEAD_CHAT_ROLE_ID != 0 else None
-    if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
-        dead_chat_role = discord.utils.get(ctx.guild.roles, name=DEAD_CHAT_ROLE_NAME)
-    if dead_chat_role is None:
-        return await ctx.respond("Dead Chat role is not configured correctly.", ephemeral=True)
-    if dead_chat_role not in ctx.author.roles:
-        return await ctx.respond("You need the Dead Chat role to use this command!", ephemeral=True)
-    colors = DEAD_CHAT_COLORS
-    current_index = next((i for i, c in enumerate(colors) if c.value == dead_chat_role.color.value), None)
-    next_index = 0 if current_index is None else (current_index + 1) % len(colors)
-    next_color = colors[next_index]
-    try:
-        await dead_chat_role.edit(color=next_color, reason="Dead Chat color cycle")
-    except discord.Forbidden:
-        return await ctx.respond("I don't have permission to edit the Dead Chat role.", ephemeral=True)
-    await ctx.respond(f"Changed **Dead Chat** role color (step {next_index + 1}/{len(colors)} in the cycle).", ephemeral=True)
-
 @bot.slash_command(name="say")
 async def say(ctx, message: str):
     if not (ctx.author.guild_permissions.administrator or ctx.guild.owner_id == ctx.author.id):
