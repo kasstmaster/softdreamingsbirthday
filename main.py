@@ -161,16 +161,16 @@ async def run_startup_checks():
     lines.append("[LOGGING]")
     log_channel = bot.get_channel(BOT_LOG_THREAD_ID) if BOT_LOG_THREAD_ID else None
     if BOT_LOG_THREAD_ID == 0:
-        lines.append("`✅` **Log thread ID** — BOT_LOG_THREAD_ID is missing or zero, so no system logs can be delivered to the log thread.")
+        lines.append("`⚠️` Log thread ID missing or zero (BOT_LOG_THREAD_ID).")
     elif log_channel is None:
-        lines.append("`✅` **Log thread channel** — The configured BOT_LOG_THREAD_ID does not resolve to an accessible channel, so thread logging will fail.")
+        lines.append("`⚠️` Log thread channel not accessible (BOT_LOG_THREAD_ID does not resolve).")
     else:
         lines.append(f"`✅` Log thread configured in channel {BOT_LOG_THREAD_ID}")
     lines.append("")
 
     lines.append("[STORAGE]")
 
-    storage_ok = False    # birthday JSON validity
+    storage_ok = False
     try:
         data = await _load_storage_message()
         storage_ok = isinstance(data, dict)
@@ -180,7 +180,7 @@ async def run_startup_checks():
     if storage_ok:
         lines.append("`✅` Birthday storage data")
     else:
-        lines.append("`✅` **Birthday storage data** — Birthday JSON could not be loaded or parsed, so stored birthdays may be lost or unreadable.")
+        lines.append("`⚠️` Birthday storage data could not be loaded or parsed")
 
     birthday_storage_binding_ok = (
         storage_message_id is not None
@@ -190,9 +190,9 @@ async def run_startup_checks():
     if birthday_storage_binding_ok:
         lines.append(f"`✅` Birthday storage message binding (msg_id={storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
     else:
-        lines.append("`✅` **Birthday storage message binding** — The birthday storage message or its channel is missing or inaccessible, so birthday data cannot be persisted.")
+        lines.append("`⚠️` Birthday storage message binding missing or inaccessible")
 
-    pool_ok = False    # pool JSON validity
+    pool_ok = False
     try:
         pool = await _load_pool_message()
         pool_ok = isinstance(pool, dict)
@@ -202,7 +202,7 @@ async def run_startup_checks():
     if pool_ok:
         lines.append("`✅` Pool storage data")
     else:
-        lines.append("`✅` **Pool storage data** — Pool JSON could not be loaded or parsed, so the movie pool may reset or become corrupt.")
+        lines.append("`⚠️` Pool storage data could not be loaded or parsed")
 
     pool_storage_binding_ok = (
         pool_storage_message_id is not None
@@ -212,7 +212,13 @@ async def run_startup_checks():
     if pool_storage_binding_ok:
         lines.append(f"`✅` Pool storage message binding (msg_id={pool_storage_message_id}, channel_id={BIRTHDAY_STORAGE_CHANNEL_ID})")
     else:
-        lines.append("`✅` **Pool storage message binding** — The pool storage message or its channel is missing or inaccessible, so pool data cannot be persisted.")
+        lines.append("`⚠️` Pool storage message binding missing or inaccessible")
+
+    storage_channel = bot.get_channel(BIRTHDAY_STORAGE_CHANNEL_ID) if BIRTHDAY_STORAGE_CHANNEL_ID else None
+    if storage_channel:
+        lines.append("`✅` Birthday storage channel")
+    else:
+        lines.append("`⚠️` Birthday storage channel not found")
 
     lines.append("")
     lines.append("[QOTD / MEDIA]")
@@ -221,16 +227,34 @@ async def run_startup_checks():
     if sheets_ok:
         lines.append("`✅` Google Sheets client")
     else:
-        lines.append("`✅` **Google Sheets client** — Google credentials or sheet ID are invalid or missing, so QOTD and the movie library cannot be loaded from Sheets.")
+        lines.append("`⚠️` Google Sheets client missing or invalid (credentials or sheet ID)")
 
     movies_ok = isinstance(movie_titles, list)
     count = len(movie_titles) if movies_ok else 0
     if movies_ok and count > 0:
         lines.append(f"`✅` Movie list loaded ({count} item(s))")
     elif movies_ok:
-        lines.append("`✅` **Movie list state** — Movie list loaded as an empty list, so no movies are available for picks or pool operations.")
+        lines.append("`⚠️` Movie list loaded as an empty list")
     else:
-        lines.append("`✅` **Movie list initialization** — Movie list is not a valid list object, so media-based commands depending on it will fail.")
+        lines.append("`⚠️` Movie list is not a valid list object")
+
+    qotd_channel = bot.get_channel(QOTD_CHANNEL_ID) if QOTD_CHANNEL_ID else None
+    if qotd_channel:
+        lines.append("`✅` QOTD channel")
+    else:
+        lines.append("`⚠️` QOTD channel not found")
+
+    rating_channel = bot.get_channel(RATING_CHANNEL_ID) if RATING_CHANNEL_ID else None
+    if rating_channel:
+        lines.append("`✅` Movie rating channel")
+    else:
+        lines.append("`⚠️` Movie rating channel not found")
+
+    movie_storage_channel = bot.get_channel(MOVIE_STORAGE_CHANNEL_ID) if MOVIE_STORAGE_CHANNEL_ID else None
+    if movie_storage_channel:
+        lines.append("`✅` Movie storage channel")
+    else:
+        lines.append("`⚠️` Movie storage channel not found")
 
     lines.append("")
     lines.append("[THEMES]")
@@ -239,106 +263,84 @@ async def run_startup_checks():
     if emoji_names:
         lines.append(f"`✅` Theme emoji config ({len(emoji_names)} name(s))")
     else:
-        lines.append("`✅` **Theme emoji config** — Theme emoji environment JSON is missing, invalid, or empty, so seasonal emojis cannot be created.")
+        lines.append("`⚠️` Theme emoji config missing or empty")
 
     if THEME_CHRISTMAS_ROLES:
         lines.append("`✅` Christmas role templates")
     else:
-        lines.append("`✅` **Christmas role templates** — Christmas role mapping is not defined, so seasonal Christmas roles cannot be assigned.")
+        lines.append("`⚠️` Christmas role templates not defined")
 
     if THEME_HALLOWEEN_ROLES:
         lines.append("`✅` Halloween role templates")
     else:
-        lines.append("`✅` **Halloween role templates** — Halloween role mapping is not defined, so seasonal Halloween roles cannot be assigned.")
+        lines.append("`⚠️` Halloween role templates not defined")
 
     if ICON_DEFAULT_URL:
         lines.append("`✅` Default icon URL")
     else:
-        lines.append("`✅` **Default icon URL** — ICON_DEFAULT_URL is missing, so the bot and server icons cannot revert to a non-themed default.")
+        lines.append("`⚠️` Default icon URL missing")
 
     if ICON_CHRISTMAS_URL:
         lines.append("`✅` Christmas icon URL")
     else:
-        lines.append("`✅` **Christmas icon URL** — ICON_CHRISTMAS_URL is missing, so the Christmas theme cannot update the bot or server icon.")
+        lines.append("`⚠️` Christmas icon URL missing")
 
     if ICON_HALLOWEEN_URL:
         lines.append("`✅` Halloween icon URL")
     else:
-        lines.append("`✅` **Halloween icon URL** — ICON_HALLOWEEN_URL is missing, so the Halloween theme cannot update the bot or server icon.")
+        lines.append("`⚠️` Halloween icon URL missing")
 
     lines.append("")
-    lines.append("[PER-GUILD CONFIG]")
+    lines.append("[ROLES / VC]")
 
     guild = bot.guilds[0] if bot.guilds else None
-
     if guild is None:
-        lines.append("`⚠️` Bot is not connected to a guild.")
-        return
+        lines.append("`⚠️` Bot is not connected to a guild")
+    else:
+        birthday_role = guild.get_role(BIRTHDAY_ROLE_ID) if BIRTHDAY_ROLE_ID else None
+        if birthday_role:
+            lines.append(f"`✅` Birthday role found ({birthday_role.name}, id={birthday_role.id})")
+        else:
+            lines.append("`⚠️` Birthday role missing or invalid")
 
-    lines.append(f"Guild: {guild.name} ({guild.id})")
+        dead_chat_role = None
+        if DEAD_CHAT_ROLE_ID:
+            dead_chat_role = guild.get_role(DEAD_CHAT_ROLE_ID)
+        if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
+            dead_chat_role = discord.utils.get(guild.roles, name=DEAD_CHAT_ROLE_NAME)
+
+        if dead_chat_role:
+            lines.append(f"`✅` Dead Chat role found ({dead_chat_role.name}, id={dead_chat_role.id})")
+        else:
+            lines.append("`⚠️` Dead Chat role missing or invalid")
+
+        vc_id = 1331501272804884490
+        vc_role_id = 1444555985728442390
+
+        vc_channel = guild.get_channel(vc_id)
+        vc_role = guild.get_role(vc_role_id)
+
+        if vc_channel:
+            lines.append(f"`✅` VC channel found for VC-status tracking ({vc_channel.name}, id={vc_id})")
+        else:
+            lines.append(f"`⚠️` VC channel {vc_id} not found")
+
+        if vc_role:
+            lines.append(f"`✅` VC-status role found ({vc_role.name}, id={vc_role_id})")
+        else:
+            lines.append(f"`⚠️` VC-status role {vc_role_id} not found")
+
     lines.append("")
-
-    def chan_ok(cid: int) -> bool:
-        return bool(cid) and guild.get_channel(cid) is not None
-
-    if chan_ok(RATING_CHANNEL_ID):
-        lines.append("`✅` Movie rating channel")
-    else:
-        lines.append("`⚠️` Movie rating channel not found")
-
-    if chan_ok(QOTD_CHANNEL_ID):
-        lines.append("`✅` QOTD channel")
-    else:
-        lines.append("`⚠️` QOTD channel not found")
-
-    if chan_ok(BIRTHDAY_STORAGE_CHANNEL_ID):
-        lines.append("`✅` Birthday storage channel")
-    else:
-        lines.append("`⚠️` Birthday storage channel not found")
-
-    if chan_ok(MOVIE_STORAGE_CHANNEL_ID):
-        lines.append("`✅` Movie storage channel")
-    else:
-        lines.append("`⚠️` Movie storage channel not found")
-
-    birthday_role = guild.get_role(BIRTHDAY_ROLE_ID) if BIRTHDAY_ROLE_ID else None
-    if birthday_role:
-        lines.append(f"`✅` Birthday role found ({birthday_role.name}, id={birthday_role.id})")
-    else:
-        lines.append("`⚠️` Birthday role missing or invalid")
-
-    dead_chat_role = None
-    if DEAD_CHAT_ROLE_ID:
-        dead_chat_role = guild.get_role(DEAD_CHAT_ROLE_ID)
-    if dead_chat_role is None and DEAD_CHAT_ROLE_NAME:
-        dead_chat_role = discord.utils.get(guild.roles, name=DEAD_CHAT_ROLE_NAME)
-
-    if dead_chat_role:
-        lines.append(f"`✅` Dead Chat role found ({dead_chat_role.name}, id={dead_chat_role.id})")
-    else:
-        lines.append("`⚠️` Dead Chat role missing or invalid")
-
-    vc_id = 1331501272804884490
-    vc_role_id = 1444555985728442390
-
-    vc_channel = guild.get_channel(vc_id)
-    vc_role = guild.get_role(vc_role_id)
-
-    if vc_channel:
-        lines.append(f"`✅` VC channel found for VC-status tracking ({vc_channel.name}, id={vc_id})")
-    else:
-        lines.append(f"`⚠️` VC channel {vc_id} not found")
-
-    if vc_role:
-        lines.append(f"`✅` VC-status role found ({vc_role.name}, id={vc_role_id})")
-    else:
-        lines.append(f"`⚠️` VC-status role {vc_role_id} not found")
+    lines.append("")
+    lines.append("All systems passed basic storage + runtime checks.")
+    lines.append(f"[STARTUP] Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
+    lines.append("Schedulers started: birthday_checker, qotd_scheduler, theme_scheduler.")
 
     text = "\n".join(lines)
     if len(text) > 1900:
         text = text[:1900]
     await log_to_thread(text)
-
+    
 def build_mm_dd(month_name: str, day: int) -> str | None:
     month_num = MONTH_TO_NUM.get(month_name)
     if not month_num or not (1 <= day <= 31):
@@ -1149,13 +1151,10 @@ async def on_ready():
         await log_exception("on_ready_init", e)
 
     await run_startup_checks()
-    await log_to_thread("All systems passed basic storage + runtime checks.")
-    await log_to_thread(f"[STARTUP] Member Bot ready as {bot.user} in {len(bot.guilds)} guild(s).")
 
     bot.loop.create_task(birthday_checker())
     bot.loop.create_task(qotd_scheduler())
     bot.loop.create_task(theme_scheduler())
-    await log_to_thread("Schedulers started: birthday_checker, qotd_scheduler, theme_scheduler.")
     print("QOTD scheduler started + Google Sheets ready!")
 
     global startup_logging_done
@@ -1170,7 +1169,7 @@ async def on_ready():
             await channel.send(big_text)
     except Exception:
         pass
-
+        
 @bot.event
 async def on_member_join(member):
     try:
